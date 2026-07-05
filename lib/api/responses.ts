@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { ZodError } from 'zod';
+import { reportError } from '@/lib/errors/error-reporter';
 
 export class AppError extends Error {
   constructor(
@@ -51,7 +52,10 @@ export function handleRouteError(error: unknown) {
     if (error.status === 401) return authError(error.message);
     if (error.status === 403) return permissionError(error.message);
     if (error.status === 404) return notFound(error.message);
+    if (error.status >= 500) reportError(error, { code: error.code });
     return NextResponse.json({ ok: false, error: { code: error.code, message: error.message } }, { status: error.status });
   }
-  return serverError(error instanceof Error ? error.message : 'Unexpected error');
+  const unexpected = error instanceof Error ? error : new Error('Unexpected error');
+  reportError(unexpected);
+  return serverError(unexpected.message);
 }

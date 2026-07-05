@@ -7,9 +7,9 @@ import { verifySignedTokenIntegrity } from '@/lib/security/tokens';
 const protectedPrefixes = [
   '/dealer', '/vendor', '/admin',
   '/api/vehicles', '/api/vin-analyses', '/api/crm', '/api/inventory', '/api/sales', '/api/copilot', '/api/analytics',
-  '/api/billing', '/api/team', '/api/account'
+  '/api/billing', '/api/team', '/api/account', '/api/superadmin'
 ];
-const publicPaths = ['/', '/api/health'];
+const publicPaths = ['/', '/api/health', '/api/health/live', '/api/health/ready'];
 
 function authErrorResponse(message: string, status = 401) {
   return NextResponse.json({ ok: false, error: { code: 'AUTH_ERROR', message } }, { status });
@@ -59,6 +59,6 @@ export const config = {
     '/dealer/:path*', '/vendor/:path*', '/admin/:path*',
     '/api/vehicles/:path*', '/api/vin-analyses/:path*', '/api/crm/:path*',
     '/api/inventory/:path*', '/api/sales/:path*', '/api/copilot/:path*', '/api/analytics/:path*',
-    '/api/billing/:path*', '/api/team/:path*', '/api/account/:path*'
+    '/api/billing/:path*', '/api/team/:path*', '/api/account/:path*', '/api/superadmin/:path*'
   ]
 };

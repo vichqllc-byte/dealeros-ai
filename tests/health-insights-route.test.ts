@@ -14,7 +14,11 @@ vi.mock('@/lib/db/client', () => ({
       count: vi.fn(async ({ where }) => state.vehicles.filter((item) => item.organizationId === where.organizationId).length)
     },
     activityLog: { count: vi.fn(async ({ where }) => state.activityLogs.filter((item) => item.organizationId === where.organizationId).length) },
-    auditLog: { count: vi.fn(async ({ where }) => state.auditLogs.filter((item) => item.organizationId === where.organizationId).length) }
+    auditLog: { count: vi.fn(async ({ where }) => state.auditLogs.filter((item) => item.organizationId === where.organizationId).length) },
+    // requireRoutePermission() checks maintenance-mode (an off-by-default
+    // FeatureFlag row) before evaluating any permission - stub it as
+    // absent/disabled here since this test doesn't exercise that feature.
+    featureFlag: { findUnique: vi.fn(async () => null) }
   }
 }));
 
