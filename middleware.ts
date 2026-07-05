@@ -1,12 +1,13 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { ACCESS_TOKEN_COOKIE } from '@/lib/security/cookies';
+import { API_KEY_PREFIX } from '@/lib/security/api-key-format';
 import { verifySignedTokenIntegrity } from '@/lib/security/tokens';
 
 const protectedPrefixes = [
   '/dealer', '/vendor', '/admin',
   '/api/vehicles', '/api/vin-analyses', '/api/crm', '/api/inventory', '/api/sales', '/api/copilot', '/api/analytics',
-  '/api/billing'
+  '/api/billing', '/api/team', '/api/account'
 ];
 const publicPaths = ['/', '/api/health'];
 
@@ -30,7 +31,20 @@ export async function middleware(request: NextRequest) {
   if (!protectedRoute) return NextResponse.next();
 
   const accessToken = request.cookies.get(ACCESS_TOKEN_COOKIE)?.value;
-  const tokenId = await verifySignedTokenIntegrity(accessToken);
+  let tokenId = await verifySignedTokenIntegrity(accessToken);
+
+  // API keys are signed the same way as session tokens (see
+  // lib/security/tokens.ts), just prefixed for display/recognition, so the
+  // same cheap signature check admits a valid `Authorization: Bearer`
+  // credential here. The database-backed checks (revoked/expired, and
+  // which organization/role it maps to) still happen in getSession().
+  if (!tokenId) {
+    const authHeader = request.headers.get('authorization');
+    const bearerToken = authHeader?.startsWith('Bearer ') ? authHeader.slice('Bearer '.length) : undefined;
+    if (bearerToken?.startsWith(API_KEY_PREFIX)) {
+      tokenId = await verifySignedTokenIntegrity(bearerToken.slice(API_KEY_PREFIX.length));
+    }
+  }
 
   if (!tokenId) {
     if (pathname.startsWith('/api/')) return authErrorResponse('Missing or invalid authentication token');
@@ -45,6 +59,6 @@ export const config = {
     '/dealer/:path*', '/vendor/:path*', '/admin/:path*',
     '/api/vehicles/:path*', '/api/vin-analyses/:path*', '/api/crm/:path*',
     '/api/inventory/:path*', '/api/sales/:path*', '/api/copilot/:path*', '/api/analytics/:path*',
-    '/api/billing/:path*'
+    '/api/billing/:path*', '/api/team/:path*', '/api/account/:path*'
   ]
 };

@@ -54,3 +54,11 @@ export async function sendPasswordResetEmail(to: string, resetUrl: string): Prom
     text: `A password reset was requested for this account. Visit:\n${resetUrl}\n\nThis link expires in 1 hour. If you did not request this, you can ignore this email.`
   });
 }
+
+export async function sendTeamInvitationEmail(to: string, inviteUrl: string): Promise<void> {
+  await sendEmail({
+    to,
+    subject: "You've been invited to a DealersOS team",
+    text: `You've been invited to join a team on DealersOS. Accept your invitation by visiting:\n${inviteUrl}\n\nThis invitation expires in 7 days.`
+  });
+}

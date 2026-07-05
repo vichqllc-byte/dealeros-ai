@@ -7,7 +7,8 @@ function makeRequest(pathname: string, cookiesMap: Record<string, string> = {}) 
   return {
     nextUrl: { pathname },
     url: `http://localhost:3000${pathname}`,
-    cookies: { get: (key: string) => cookiesMap[key] ? { value: cookiesMap[key] } : undefined }
+    cookies: { get: (key: string) => cookiesMap[key] ? { value: cookiesMap[key] } : undefined },
+    headers: { get: () => undefined }
   } as any;
 }
 

@@ -135,6 +135,13 @@ enum InvoiceStatus {
   UNCOLLECTIBLE
 }
 
+enum InvitationStatus {
+  PENDING
+  ACCEPTED
+  REVOKED
+  EXPIRED
+}
+
 model Organization {
   id                String                  @id @default(cuid())
   name              String
@@ -158,6 +165,8 @@ model Organization {
   subscription      Subscription?
   invoices          Invoice[]
   usageRecords      UsageRecord[]
+  invitations       Invitation[]
+  apiKeys           ApiKey[]
 }
 
 model User {
@@ -640,4 +649,48 @@ model StripeWebhookEvent {
   id          String   @id
   type        String
   processedAt DateTime @default(now())
+}
+
+// ---------------------------------------------------------------------
+// Team management
+// ---------------------------------------------------------------------
+
+model Invitation {
+  id              String           @id @default(cuid())
+  organizationId  String
+  email           String
+  role            RoleKey
+  tokenHash       String           @unique
+  invitedByUserId String?
+  status          InvitationStatus @default(PENDING)
+  expiresAt       DateTime
+  acceptedAt      DateTime?
+  createdAt       DateTime         @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, status])
+  @@index([email])
+}
+
+// API keys authenticate like sessions (an HMAC-signed opaque token, see
+// lib/security/tokens.ts) so the Edge middleware can verify a bearer
+// token's integrity the same way it verifies the access-token cookie,
+// without needing database access at the edge.
+model ApiKey {
+  id              String    @id @default(cuid())
+  organizationId  String
+  name            String
+  keyHash         String    @unique
+  keyPrefix       String
+  role            RoleKey
+  createdByUserId String?
+  lastUsedAt      DateTime?
+  revokedAt       DateTime?
+  expiresAt       DateTime?
+  createdAt       DateTime  @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
 }
