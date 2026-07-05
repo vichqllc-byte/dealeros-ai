@@ -4,6 +4,7 @@ import { writeActivityLog } from '@/lib/activity/write-activity-log';
 import { createTaskSchema } from '@/lib/validators/crm';
 import { AppError } from '@/lib/api/responses';
 import { assertLeadAndCustomerOwnership } from '@/lib/server/crm/assert-crm-ownership';
+import { notifyUser } from '@/lib/server/notifications/notification-service';
 
 export async function listTasksForOrg(organizationId: string) {
   return db.task.findMany({ where: { organizationId }, orderBy: [{ status: 'asc' }, { dueAt: 'asc' }] });
@@ -16,6 +17,23 @@ export async function createTaskForOrg(organizationId: string, actorUserId: stri
   const task = await db.task.create({ data: { ...input, organizationId } });
   await writeAuditLog({ organizationId, actorUserId, action: 'create', entityType: 'task', entityId: task.id, afterState: task });
   await writeActivityLog({ organizationId, actorUserId, entityType: 'task', entityId: task.id, type: 'task.created', summary: `Task created: ${task.title}`, payload: task });
+
+  if (task.assignedUserId) {
+    // assignedUserId is unvalidated client input (see createTaskSchema) -
+    // only notify if it actually resolves to a member of this org, so a
+    // bogus/foreign id can't crash task creation or leak a notification
+    // across a tenant boundary.
+    const assigneeIsMember = await db.membership.findFirst({ where: { userId: task.assignedUserId, organizationId } });
+    if (assigneeIsMember) {
+      await notifyUser(organizationId, task.assignedUserId, {
+        type: 'INFO',
+        title: 'New task assigned to you',
+        body: task.title,
+        link: `/dealer/tasks/${task.id}`
+      });
+    }
+  }
+
   return task;
 }
 
