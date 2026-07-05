@@ -8,7 +8,8 @@
 export type ProviderKey =
   | 'nmvtis' | 'carfax' | 'autocheck'
   | 'blackBook' | 'jdPower' | 'kbb' | 'manheimMmr' | 'edmunds'
-  | 'copart' | 'iaai' | 'autoAuctionServices';
+  | 'copart' | 'iaai' | 'autoAuctionServices'
+  | 'esign';
 
 const REQUIRED_ENV_VARS: Record<ProviderKey, string[]> = {
   nmvtis: ['NMVTIS_API_KEY'],
@@ -21,7 +22,8 @@ const REQUIRED_ENV_VARS: Record<ProviderKey, string[]> = {
   edmunds: ['EDMUNDS_API_KEY'],
   copart: ['COPART_API_KEY'],
   iaai: ['IAAI_API_KEY'],
-  autoAuctionServices: ['AUTO_AUCTION_SERVICES_API_KEY']
+  autoAuctionServices: ['AUTO_AUCTION_SERVICES_API_KEY'],
+  esign: ['ESIGN_PROVIDER_API_KEY']
 };
 
 export function requiredEnvVarsFor(provider: ProviderKey): string[] {

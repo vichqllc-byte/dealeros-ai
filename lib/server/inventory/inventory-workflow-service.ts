@@ -9,8 +9,13 @@ export type InventoryStage = (typeof STAGE_ORDER)[number];
 /** Forward transitions must follow the pipeline in order (no skipping a
  * stage); moving backward to any earlier stage is always allowed, since a
  * real intake process often needs to send a vehicle back for more work
- * (e.g. PRICING -> RECONDITIONING after a second inspection finding). */
+ * (e.g. PRICING -> RECONDITIONING after a second inspection finding).
+ * SOLD is a special case: a completed sale is a real, overriding business
+ * event (wholesale/fleet/private-party deals routinely close without the
+ * vehicle ever going through the full retail prep pipeline), so it is
+ * always a valid destination regardless of the current stage. */
 export function isValidStageTransition(from: InventoryStage, to: InventoryStage): boolean {
+  if (to === 'SOLD') return true;
   const fromIndex = STAGE_ORDER.indexOf(from);
   const toIndex = STAGE_ORDER.indexOf(to);
   if (toIndex <= fromIndex) return true;

@@ -43,8 +43,14 @@ describeForRouteTests('inventory workflows', () => {
 
   it('rejects skipping a stage', async () => {
     const { POST } = await import('../../app/api/vehicles/[id]/stage/route');
-    const res = await POST(jsonRequest('POST', { toStage: 'SOLD' }), { params: { id: vehicleA.id } });
+    const res = await POST(jsonRequest('POST', { toStage: 'RECONDITIONING' }), { params: { id: vehicleA.id } });
     expect(res.status).toBe(422);
+  });
+
+  it('always allows transitioning directly to Sold (a completed sale is an overriding business event)', async () => {
+    const { POST } = await import('../../app/api/vehicles/[id]/stage/route');
+    const res = await POST(jsonRequest('POST', { toStage: 'SOLD' }), { params: { id: vehicleA.id } });
+    expect(res.status).toBe(200);
   });
 
   it('advances through the full pipeline in order', async () => {
