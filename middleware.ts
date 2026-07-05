@@ -3,7 +3,10 @@ import type { NextRequest } from 'next/server';
 import { ACCESS_TOKEN_COOKIE } from '@/lib/security/cookies';
 import { verifySignedTokenIntegrity } from '@/lib/security/tokens';
 
-const protectedPrefixes = ['/dealer', '/vendor', '/admin', '/api/vehicles', '/api/vin-analyses'];
+const protectedPrefixes = [
+  '/dealer', '/vendor', '/admin',
+  '/api/vehicles', '/api/vin-analyses', '/api/crm', '/api/inventory', '/api/sales', '/api/copilot', '/api/analytics'
+];
 const publicPaths = ['/', '/api/health'];
 
 function authErrorResponse(message: string, status = 401) {
@@ -37,5 +40,9 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/dealer/:path*', '/vendor/:path*', '/admin/:path*', '/api/vehicles/:path*', '/api/vin-analyses/:path*']
+  matcher: [
+    '/dealer/:path*', '/vendor/:path*', '/admin/:path*',
+    '/api/vehicles/:path*', '/api/vin-analyses/:path*', '/api/crm/:path*',
+    '/api/inventory/:path*', '/api/sales/:path*', '/api/copilot/:path*', '/api/analytics/:path*'
+  ]
 };

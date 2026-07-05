@@ -191,3 +191,23 @@ E.g. [app/dealer/layout.tsx:4](app/dealer/layout.tsx) and [app/dealer/page.tsx:1
 ---
 
 *No source files were modified in the creation of this report. Awaiting approval before making any changes.*
+
+---
+
+## 9. Phase 6f Security Review (OWASP Top 10-focused, full codebase)
+
+Re-audit performed after Phases 1-6 (auth, multi-tenant hardening, VIN intelligence, vehicle-intelligence platform, and the enterprise CRM/inventory/sales/copilot/analytics platform). One real, significant finding, now fixed; everything else below was verified clean.
+
+### Finding, fixed: CSRF was only ever enforced on the Phase 2 auth routes
+Every state-changing route added in Phases 1, 3, 4, 5, and 6 (`/api/vehicles*`, `/api/vin-analyses*`, `/api/crm/*`, `/api/inventory/*`, `/api/sales/*`) authenticates purely via the `access_token` session cookie, which the browser attaches automatically - but none of them verified the double-submit CSRF cookie/header pair that `lib/security/guards.ts` already provides and that the Phase 2 auth routes (login/logout/register/refresh/password-reset/verify-email) already used correctly. A malicious page could have driven a logged-in dealer's browser into creating/deleting vehicles, customers, sales, etc.
+**Fixed:** `requireCsrfToken(request)` added to every POST/PATCH/DELETE handler across the app (26 route files). The shared test helper (`tests/setup/route-test-helpers.ts`'s `jsonRequest`) now attaches a matching CSRF cookie+header by default, so all 299 existing tests continued to pass without per-file changes, and a new `tests/routes/csrf-enforcement.route.test.ts` explicitly proves the check rejects requests without it (and that the target record is left untouched). `middleware.ts`'s edge-layer prefix list was also broadened to cover `/api/crm`, `/api/inventory`, `/api/sales`, `/api/copilot`, and `/api/analytics`, which had been missing from the fast-fail gate (the authoritative `getSession()` check in each route handler still covered them, so this was a defense-in-depth gap, not a full bypass).
+
+### Verified clean
+- **Injection**: no `$queryRaw`/`$executeRaw` anywhere in the codebase; every query goes through Prisma's parameterized query builder.
+- **XSS**: no `dangerouslySetInnerHTML`, `eval`, or `new Function` anywhere; all rendered content goes through React's default escaping.
+- **SSRF**: the only outbound `fetch()` calls (NHTSA vPIC decode and recalls) target a hardcoded base URL; user-supplied VIN/make/model/year values are only ever inserted into the path (URL-encoded) or query string, never the hostname, and the VIN is format-validated (17 chars, valid charset) before it ever reaches the fetch call.
+- **File upload security**: no file upload endpoint exists anywhere in the app (documents are server-generated PDFs, not user-uploaded files), so this attack surface doesn't apply yet.
+- **Rate limiting**: present on every auth endpoint (Phase 2), CRM email/SMS sending (Phase 6a), the AI copilot (Phase 6d), and now added to the two remaining resource-intensive endpoints that had none - VIN intelligence analysis (`/api/vin-analyses/analyze`, calls out to NHTSA) and PDF report generation (`/api/vehicles/[id]/report`).
+- **API abuse / authorization**: every route consistently derives `organizationId` from the authenticated session (never client input) and gates on `requireRoutePermission`; the Phase 3 tenant-isolation regression tests and this phase's CSRF tests both confirm cross-tenant mutation attempts are rejected without side effects.
+- **Secrets management**: no hardcoded credentials or private keys found in the codebase; `.gitignore` excludes real `.env`/`.env.local` files (`.env.test`/`.env.test.example` are intentionally committed and contain only non-sensitive placeholder values); every premium provider key is read from `process.env` and documented in `.env.example`.
+- **Audit logging**: every mutation across every phase writes both an `AuditLog` and `ActivityLog` entry with before/after state, consistently, including every new Phase 6 domain (CRM, inventory workflows, sales).

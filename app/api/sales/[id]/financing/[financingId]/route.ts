@@ -2,12 +2,14 @@ import { z } from 'zod';
 import { requireRoutePermission } from '@/lib/server/route-auth';
 import { updateFinancingApplicationStatus } from '@/lib/server/sales/financing-service';
 import { handleRouteError, ok } from '@/lib/api/responses';
+import { requireCsrfToken } from '@/lib/security/guards';
 
 const statusSchema = z.object({ status: z.enum(['PENDING', 'APPROVED', 'DECLINED', 'WITHDRAWN']) });
 
 export async function PATCH(request: Request, { params }: { params: { id: string; financingId: string } }) {
   try {
     const auth = await requireRoutePermission('sales.write');
+    requireCsrfToken(request);
     const body = await request.json();
     const { status } = statusSchema.parse(body);
     const data = await updateFinancingApplicationStatus(auth.session.organizationId, auth.session.userId, params.id, params.financingId, status);

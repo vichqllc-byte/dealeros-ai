@@ -1,6 +1,7 @@
 import { requireRoutePermission } from '@/lib/server/route-auth';
 import { createSaleDocumentForSale, listSaleDocuments } from '@/lib/server/sales/sale-document-service';
 import { handleRouteError, ok } from '@/lib/api/responses';
+import { requireCsrfToken } from '@/lib/security/guards';
 
 export async function GET(_request: Request, { params }: { params: { id: string } }) {
   try {
@@ -15,6 +16,7 @@ export async function GET(_request: Request, { params }: { params: { id: string 
 export async function POST(request: Request, { params }: { params: { id: string } }) {
   try {
     const auth = await requireRoutePermission('sales.write');
+    requireCsrfToken(request);
     const body = await request.json();
     const data = await createSaleDocumentForSale(auth.session.organizationId, auth.session.userId, params.id, body);
     return ok(data, 201);

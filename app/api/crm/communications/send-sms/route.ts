@@ -1,7 +1,7 @@
 import { requireRoutePermission } from '@/lib/server/route-auth';
 import { sendSmsForOrg } from '@/lib/server/crm/communication-service';
 import { handleRouteError, ok } from '@/lib/api/responses';
-import { enforceRateLimit } from '@/lib/security/guards';
+import { requireCsrfToken, enforceRateLimit } from '@/lib/security/guards';
 
 export async function POST(request: Request) {
   try {
