@@ -1,0 +1,6 @@
+-- CreateEnum
+CREATE TYPE "InventoryStage" AS ENUM ('ACQUISITION', 'PURCHASE', 'INSPECTION', 'RECONDITIONING', 'PRICING', 'PUBLISHING', 'SOLD');
+
+-- AlterTable
+ALTER TABLE "Vehicle" ADD COLUMN     "inventoryStage" "InventoryStage" NOT NULL DEFAULT 'ACQUISITION';
+

@@ -108,6 +108,16 @@ enum SignatureStatus {
   SIGNED
 }
 
+enum InventoryStage {
+  ACQUISITION
+  PURCHASE
+  INSPECTION
+  RECONDITIONING
+  PRICING
+  PUBLISHING
+  SOLD
+}
+
 model Organization {
   id                String                  @id @default(cuid())
   name              String
@@ -170,6 +180,7 @@ model Vehicle {
   mileage           Int?
   status            VehicleStatus      @default(NEW)
   workflowState     String?
+  inventoryStage    InventoryStage     @default(ACQUISITION)
   createdAt         DateTime           @default(now())
   updatedAt         DateTime           @updatedAt
   organization      Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
