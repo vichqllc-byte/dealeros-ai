@@ -5,7 +5,8 @@ import { verifySignedTokenIntegrity } from '@/lib/security/tokens';
 
 const protectedPrefixes = [
   '/dealer', '/vendor', '/admin',
-  '/api/vehicles', '/api/vin-analyses', '/api/crm', '/api/inventory', '/api/sales', '/api/copilot', '/api/analytics'
+  '/api/vehicles', '/api/vin-analyses', '/api/crm', '/api/inventory', '/api/sales', '/api/copilot', '/api/analytics',
+  '/api/billing'
 ];
 const publicPaths = ['/', '/api/health'];
 
@@ -43,6 +44,7 @@ export const config = {
   matcher: [
     '/dealer/:path*', '/vendor/:path*', '/admin/:path*',
     '/api/vehicles/:path*', '/api/vin-analyses/:path*', '/api/crm/:path*',
-    '/api/inventory/:path*', '/api/sales/:path*', '/api/copilot/:path*', '/api/analytics/:path*'
+    '/api/inventory/:path*', '/api/sales/:path*', '/api/copilot/:path*', '/api/analytics/:path*',
+    '/api/billing/:path*'
   ]
 };

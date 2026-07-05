@@ -118,6 +118,23 @@ enum InventoryStage {
   SOLD
 }
 
+enum SubscriptionStatus {
+  TRIALING
+  ACTIVE
+  PAST_DUE
+  CANCELED
+  INCOMPLETE
+  UNPAID
+}
+
+enum InvoiceStatus {
+  DRAFT
+  OPEN
+  PAID
+  VOID
+  UNCOLLECTIBLE
+}
+
 model Organization {
   id                String                  @id @default(cuid())
   name              String
@@ -138,6 +155,9 @@ model Organization {
   priceRecords      PriceRecord[]
   listings          Listing[]
   sales             Sale[]
+  subscription      Subscription?
+  invoices          Invoice[]
+  usageRecords      UsageRecord[]
 }
 
 model User {
@@ -552,4 +572,72 @@ model SaleDocument {
   sale Sale @relation(fields: [saleId], references: [id], onDelete: Cascade)
 
   @@index([saleId, type])
+}
+
+// ---------------------------------------------------------------------
+// Payments / billing
+// ---------------------------------------------------------------------
+
+model Subscription {
+  id                   String             @id @default(cuid())
+  organizationId       String             @unique
+  planKey              String
+  status               SubscriptionStatus @default(INCOMPLETE)
+  seats                Int                @default(1)
+  stripeCustomerId     String?            @unique
+  stripeSubscriptionId String?            @unique
+  currentPeriodStart   DateTime?
+  currentPeriodEnd     DateTime?
+  cancelAtPeriodEnd    Boolean            @default(false)
+  trialEndsAt          DateTime?
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime           @updatedAt
+
+  organization Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  invoices     Invoice[]
+  usageRecords UsageRecord[]
+}
+
+model Invoice {
+  id               String        @id @default(cuid())
+  organizationId   String
+  subscriptionId   String?
+  stripeInvoiceId  String        @unique
+  status           InvoiceStatus
+  amountDueCents   Int
+  amountPaidCents  Int
+  currency         String        @default("usd")
+  hostedInvoiceUrl String?
+  invoicePdfUrl    String?
+  periodStart      DateTime?
+  periodEnd        DateTime?
+  createdAt        DateTime      @default(now())
+
+  organization Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  subscription Subscription? @relation(fields: [subscriptionId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, createdAt])
+}
+
+model UsageRecord {
+  id               String   @id @default(cuid())
+  organizationId   String
+  subscriptionId   String?
+  metric           String
+  quantity         Int
+  reportedToStripe Boolean  @default(false)
+  recordedAt       DateTime @default(now())
+
+  organization Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  subscription Subscription? @relation(fields: [subscriptionId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, metric, recordedAt])
+}
+
+// Idempotency ledger for processed Stripe webhook events - Stripe may
+// redeliver the same event, and this table is checked before applying one.
+model StripeWebhookEvent {
+  id          String   @id
+  type        String
+  processedAt DateTime @default(now())
 }
