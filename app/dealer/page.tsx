@@ -160,6 +160,7 @@ export default async function DealerPage() {
               id: item.id,
               vehicleId: item.vehicleId,
               recommendation: item.recommendation,
+              workflowState: item.workflowState,
               projectedRoi: item.projectedRoi ? Number(item.projectedRoi) : null,
               vehicle: { vin: item.vehicle.vin }
             }))}

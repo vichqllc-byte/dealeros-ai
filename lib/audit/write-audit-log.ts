@@ -1,3 +1,4 @@
+import { Prisma } from '@prisma/client';
 import { db } from '@/lib/db/client';
 
 type WriteAuditLogInput = {
@@ -6,8 +7,8 @@ type WriteAuditLogInput = {
   action: string;
   entityType: string;
   entityId: string;
-  beforeState?: unknown;
-  afterState?: unknown;
+  beforeState?: Prisma.InputJsonValue;
+  afterState?: Prisma.InputJsonValue;
 };
 
 export async function writeAuditLog(input: WriteAuditLogInput) {

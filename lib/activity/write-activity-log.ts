@@ -1,3 +1,4 @@
+import { Prisma } from '@prisma/client';
 import { db } from '@/lib/db/client';
 
 type WriteActivityLogInput = {
@@ -7,7 +8,7 @@ type WriteActivityLogInput = {
   entityId: string;
   type: string;
   summary: string;
-  payload?: unknown;
+  payload?: Prisma.InputJsonValue;
 };
 
 export async function writeActivityLog(input: WriteActivityLogInput) {

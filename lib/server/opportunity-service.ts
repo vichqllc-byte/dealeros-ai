@@ -10,7 +10,12 @@ export async function listOpportunitySummariesForOrg(organizationId: string) {
 
   return vehicles.map((vehicle) => {
     const latestAnalysis = vehicle.vinAnalyses[0];
-    const insight = buildOpportunityInsight(vehicle, latestAnalysis);
+    const insight = buildOpportunityInsight(
+      vehicle,
+      latestAnalysis
+        ? { ...latestAnalysis, projectedRoi: latestAnalysis.projectedRoi ? Number(latestAnalysis.projectedRoi) : null }
+        : undefined
+    );
     return {
       id: vehicle.id,
       vin: vehicle.vin,
