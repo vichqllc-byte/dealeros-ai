@@ -3,6 +3,7 @@ import { testDb, jsonBody, jsonRequest, resetAuth, useSession, ensureTestDatabas
 import { authMocks } from '../../lib/test/auth-mocks';
 import { hashPassword } from '@/lib/security/password';
 import { resetRateLimitState } from '@/lib/security/rate-limit';
+import { resetDefaultCacheClient } from '@/lib/cache/cache-client';
 
 const routeTestsEnabled = await ensureTestDatabase();
 const describeForRouteTests = routeTestsEnabled ? describe : describe.skip;
@@ -22,6 +23,11 @@ describeForRouteTests('analytics and copilot', () => {
   beforeEach(async () => {
     resetAuth();
     resetRateLimitState();
+    // getDealerAnalyticsForOrg caches its result briefly (see
+    // lib/server/analytics/analytics-service.ts); several tests below
+    // hit the same organizationId with different underlying data, so the
+    // cache must not survive between them.
+    resetDefaultCacheClient();
     await testDb.saleDocument.deleteMany();
     await testDb.financingApplication.deleteMany();
     await testDb.tradeInVehicle.deleteMany();

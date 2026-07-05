@@ -1,0 +1,16 @@
+node_modules
+.next
+.git
+.github
+.env
+.env.local
+.env.test
+.env.test.local
+*.log
+coverage
+playwright-report
+test-results
+tests
+__tests__
+docker-compose*.yml
+REPORT.md

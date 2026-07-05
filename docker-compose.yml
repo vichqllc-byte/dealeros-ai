@@ -1,0 +1,43 @@
+# Production deployment compose file. Provide real secrets via a
+# non-committed .env file (see .env.production.example) or your platform's
+# secrets manager - never bake them into this file or the image.
+services:
+  app:
+    build: .
+    ports:
+      - '3000:3000'
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+      DIRECT_URL: ${DIRECT_URL}
+      AUTH_TOKEN_SECRET: ${AUTH_TOKEN_SECRET}
+      NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL}
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY}
+      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET}
+      STRIPE_PRICE_STARTER_MONTHLY: ${STRIPE_PRICE_STARTER_MONTHLY:-}
+      STRIPE_PRICE_STARTER_ANNUAL: ${STRIPE_PRICE_STARTER_ANNUAL:-}
+      STRIPE_PRICE_PROFESSIONAL_MONTHLY: ${STRIPE_PRICE_PROFESSIONAL_MONTHLY:-}
+      STRIPE_PRICE_PROFESSIONAL_ANNUAL: ${STRIPE_PRICE_PROFESSIONAL_ANNUAL:-}
+      STRIPE_PRICE_ENTERPRISE_MONTHLY: ${STRIPE_PRICE_ENTERPRISE_MONTHLY:-}
+      STRIPE_PRICE_ENTERPRISE_ANNUAL: ${STRIPE_PRICE_ENTERPRISE_ANNUAL:-}
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: dealeros
+      POSTGRES_USER: dealeros
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD to a real secret}
+    volumes:
+      - dealeros-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U dealeros -d dealeros']
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+
+volumes:
+  dealeros-db-data:

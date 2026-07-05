@@ -1,4 +1,4 @@
-name: DealersOS Phase 1 CI
+name: DealerOS CI
 
 on:
   push:
@@ -26,18 +26,27 @@ jobs:
       DATABASE_URL: postgresql://dealeros_test:dealeros_test_pw@localhost:54329/dealeros_test
       DIRECT_URL: postgresql://dealeros_test:dealeros_test_pw@localhost:54329/dealeros_test
       AUTH_TOKEN_SECRET: test-only-auth-token-secret-do-not-use-in-production
-      SUPABASE_URL: https://test-project.supabase.co
-      SUPABASE_ANON_KEY: test-anon-key
-      SUPABASE_SERVICE_ROLE_KEY: test-service-role-key
       NEXT_PUBLIC_APP_URL: http://localhost:3000
+      STRIPE_SECRET_KEY: sk_test_placeholder_for_ci
+      STRIPE_WEBHOOK_SECRET: whsec_placeholder_for_ci
+      STRIPE_PRICE_STARTER_MONTHLY: price_test_starter_monthly
+      STRIPE_PRICE_STARTER_ANNUAL: price_test_starter_annual
+      STRIPE_PRICE_PROFESSIONAL_MONTHLY: price_test_professional_monthly
+      STRIPE_PRICE_PROFESSIONAL_ANNUAL: price_test_professional_annual
+      STRIPE_PRICE_ENTERPRISE_MONTHLY: price_test_enterprise_monthly
+      STRIPE_PRICE_ENTERPRISE_ANNUAL: price_test_enterprise_annual
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 20
       - run: npm install
+      - run: npx prisma validate
       - run: npx prisma generate
       - run: npx prisma migrate deploy
       - run: npx tsx prisma/test-seed/seed.ts
+      - run: npx tsc --noEmit
+      - run: npm run lint
       - run: npm run test:routes
       - run: npm run test
+      - run: npm run build

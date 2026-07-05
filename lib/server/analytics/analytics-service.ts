@@ -1,7 +1,14 @@
 import { db } from '@/lib/db/client';
+import { getDefaultCacheClient } from '@/lib/cache/cache-client';
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 const DEFAULT_TURN_WINDOW_DAYS = 90;
+
+// This dashboard aggregates across Sale/Vehicle/Lead/VinAnalysis with
+// several full-table scans per organization - real work, not a cheap
+// lookup - so short-lived caching meaningfully cuts DB load for a view
+// that's opened repeatedly and doesn't need per-second freshness.
+const ANALYTICS_CACHE_TTL_MS = 30_000;
 
 function toNumber(value: unknown): number {
   return value == null ? 0 : Number(value);
@@ -14,6 +21,17 @@ function toNumber(value: unknown): number {
  * breakdowns rather than sample figures.
  */
 export async function getDealerAnalyticsForOrg(organizationId: string, turnWindowDays = DEFAULT_TURN_WINDOW_DAYS) {
+  const cache = getDefaultCacheClient();
+  const cacheKey = `analytics-dashboard:${organizationId}:${turnWindowDays}`;
+  const cached = await cache.get<Awaited<ReturnType<typeof computeDealerAnalyticsForOrg>>>(cacheKey);
+  if (cached !== undefined) return cached;
+
+  const result = await computeDealerAnalyticsForOrg(organizationId, turnWindowDays);
+  await cache.set(cacheKey, result, ANALYTICS_CACHE_TTL_MS);
+  return result;
+}
+
+async function computeDealerAnalyticsForOrg(organizationId: string, turnWindowDays: number) {
   const windowStart = new Date(Date.now() - turnWindowDays * MS_PER_DAY);
 
   const [completedSales, allVehicles, leads, recentAnalyses] = await Promise.all([

@@ -46,7 +46,21 @@ export function serverError(message = 'Internal server error') {
   return NextResponse.json({ ok: false, error: { code: 'SERVER_ERROR', message } }, { status: 500 });
 }
 
+/**
+ * Next.js signals its own internal control flow (e.g. "this route used
+ * cookies()/headers() during the build's static-render probe, so mark
+ * it dynamic") by throwing an Error carrying a special `digest`. These
+ * aren't application errors - re-throwing them (rather than reporting
+ * and converting to a 500) is the documented way to keep that framework
+ * machinery working correctly and avoid logging a false-positive.
+ */
+function isNextInternalControlFlowError(error: unknown): boolean {
+  const digest = (error as { digest?: unknown } | null)?.digest;
+  return typeof digest === 'string' && (digest === 'DYNAMIC_SERVER_USAGE' || digest.startsWith('NEXT_REDIRECT') || digest.startsWith('NEXT_NOT_FOUND'));
+}
+
 export function handleRouteError(error: unknown) {
+  if (isNextInternalControlFlowError(error)) throw error;
   if (error instanceof ZodError) return validationError(error);
   if (error instanceof AppError) {
     if (error.status === 401) return authError(error.message);

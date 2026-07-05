@@ -1,6 +1,9 @@
 generator client {
   provider      = "prisma-client-js"
-  binaryTargets = ["native", "windows"]
+  // "debian-openssl-3.0.x" matches the Dockerfile's node:20-slim
+  // (Debian bookworm) runtime, so `prisma generate` produces a working
+  // engine binary for the containerized deployment, not just local dev.
+  binaryTargets = ["native", "windows", "debian-openssl-3.0.x"]
 }
 
 datasource db {
@@ -395,6 +398,7 @@ model Lead {
 
   @@index([organizationId, status])
   @@index([customerId])
+  @@index([vehicleId])
 }
 
 model Task {
@@ -557,6 +561,7 @@ model Sale {
 
   @@index([organizationId, status])
   @@index([vehicleId])
+  @@index([customerId])
 }
 
 model TradeInVehicle {
@@ -814,4 +819,5 @@ model SuperAdminAuditLog {
   actor User @relation(fields: [actorUserId], references: [id], onDelete: Cascade)
 
   @@index([createdAt])
+  @@index([actorUserId])
 }

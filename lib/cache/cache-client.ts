@@ -46,3 +46,10 @@ export function getDefaultCacheClient(): CacheClient {
   if (!defaultClient) defaultClient = new InMemoryCacheClient();
   return defaultClient;
 }
+
+/** Test-only: forces a fresh cache instance so tests that reuse the same
+ * cache key (e.g. the same organizationId) across multiple assertions
+ * with different underlying data don't see a stale cached value. */
+export function resetDefaultCacheClient(): void {
+  defaultClient = new InMemoryCacheClient();
+}
