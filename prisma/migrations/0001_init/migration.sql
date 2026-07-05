@@ -1,0 +1,2 @@
+-- Initial DealersOS Phase 1 schema migration placeholder.
+-- Run `prisma migrate dev` after environment setup to generate DB-specific SQL.

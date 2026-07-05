@@ -1,0 +1,149 @@
+generator client {
+  provider = "prisma-client-js"
+  binaryTargets = ["native", "windows"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+enum RoleKey {
+  DEALER_OWNER
+  DEALER_BUYER
+  VENDOR_MANAGER
+  ADMIN
+}
+
+enum VehicleStatus {
+  NEW
+  ANALYZED
+  NEGOTIATING
+  APPROVAL_PENDING
+  PURCHASED
+  RECONDITIONING
+  SOLD
+  PASSED
+}
+
+enum RecommendationKey {
+  BUY
+  NEGOTIATE
+  WAIT
+  PASS
+}
+
+model Organization {
+  id            String       @id @default(cuid())
+  name          String
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+  memberships   Membership[]
+  vehicles      Vehicle[]
+  auditLogs     AuditLog[]
+  activityLogs  ActivityLog[]
+}
+
+model User {
+  id            String       @id @default(cuid())
+  email         String       @unique
+  firstName     String
+  lastName      String
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+  memberships   Membership[]
+  auditEntries  AuditLog[]   @relation("AuditActor")
+}
+
+model Membership {
+  id             String       @id @default(cuid())
+  userId         String
+  organizationId String
+  role           RoleKey
+  createdAt      DateTime     @default(now())
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, organizationId])
+  @@index([organizationId, role])
+}
+
+model Vehicle {
+  id               String        @id @default(cuid())
+  organizationId   String
+  vin              String        @unique
+  year             Int?
+  make             String?
+  model            String?
+  trim             String?
+  mileage          Int?
+  status           VehicleStatus @default(NEW)
+  workflowState    String?
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+  organization     Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  vinAnalyses      VinAnalysis[]
+
+  @@index([organizationId, status])
+}
+
+model VinAnalysis {
+  id                 String            @id @default(cuid())
+  vehicleId          String
+  decodedPayload     Json
+  manualCorrections  Json?
+  marketValue        Decimal?          @db.Decimal(12, 2)
+  wholesaleValue     Decimal?          @db.Decimal(12, 2)
+  retailValue        Decimal?          @db.Decimal(12, 2)
+  transportEstimate  Decimal?          @db.Decimal(12, 2)
+  repairEstimate     Decimal?          @db.Decimal(12, 2)
+  feesEstimate       Decimal?          @db.Decimal(12, 2)
+  taxesEstimate      Decimal?          @db.Decimal(12, 2)
+  projectedRoi       Decimal?          @db.Decimal(12, 2)
+  confidenceScore    Float?
+  riskSummary        String?
+  aiExplanation      String?
+  recommendation     RecommendationKey?
+  workflowState      String?
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
+  vehicle            Vehicle           @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+
+  @@index([vehicleId, createdAt])
+}
+
+
+
+model ActivityLog {
+  id              String       @id @default(cuid())
+  organizationId  String
+  actorUserId     String?
+  entityType      String
+  entityId        String
+  type            String
+  summary         String
+  payload         Json?
+  createdAt       DateTime     @default(now())
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, createdAt])
+  @@index([entityType, entityId])
+}
+
+model AuditLog {
+  id              String       @id @default(cuid())
+  organizationId  String
+  actorUserId     String?
+  action          String
+  entityType      String
+  entityId        String
+  beforeState     Json?
+  afterState      Json?
+  createdAt       DateTime     @default(now())
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  actor           User?        @relation("AuditActor", fields: [actorUserId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, createdAt])
+  @@index([entityType, entityId])
+}
