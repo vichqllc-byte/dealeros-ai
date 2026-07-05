@@ -1,4 +1,5 @@
 import { PrismaClient, RoleKey, VehicleStatus, RecommendationKey } from '@prisma/client';
+import { hashPassword } from '../lib/security/password';
 
 const prisma = new PrismaClient();
 
@@ -18,7 +19,9 @@ async function main() {
     create: {
       email: 'owner@dealeros.ai',
       firstName: 'Demo',
-      lastName: 'Owner'
+      lastName: 'Owner',
+      passwordHash: await hashPassword('Demo-Owner-Password-123!'),
+      emailVerifiedAt: new Date()
     }
   });
 

@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { testDb, jsonBody, jsonRequest, resetAuth, useSession, ensureTestDatabase } from '../setup/route-test-helpers';
 import { authMocks } from '../../lib/test/auth-mocks';
+import { hashPassword } from '@/lib/security/password';
 
 const routeTestsEnabled = await ensureTestDatabase();
 const describeForRouteTests = routeTestsEnabled ? describe : describe.skip;
@@ -25,11 +26,12 @@ describeForRouteTests('vin analysis routes', () => {
     await testDb.organization.deleteMany();
 
     await testDb.organization.createMany({ data: [{ id: 'org-a', name: 'Org A' }, { id: 'org-b', name: 'Org B' }] });
+    const testPasswordHash = await hashPassword('Test-Fixture-Password-123!');
     await testDb.user.createMany({ data: [
-      { id: 'user-dealer', email: 'dealer@test.com', firstName: 'Dealer', lastName: 'User' },
-      { id: 'user-vendor', email: 'vendor@test.com', firstName: 'Vendor', lastName: 'User' },
-      { id: 'user-admin', email: 'admin@test.com', firstName: 'Admin', lastName: 'User' },
-      { id: 'user-outsider', email: 'out@test.com', firstName: 'Out', lastName: 'User' }
+      { id: 'user-dealer', email: 'dealer@test.com', firstName: 'Dealer', lastName: 'User', passwordHash: testPasswordHash },
+      { id: 'user-vendor', email: 'vendor@test.com', firstName: 'Vendor', lastName: 'User', passwordHash: testPasswordHash },
+      { id: 'user-admin', email: 'admin@test.com', firstName: 'Admin', lastName: 'User', passwordHash: testPasswordHash },
+      { id: 'user-outsider', email: 'out@test.com', firstName: 'Out', lastName: 'User', passwordHash: testPasswordHash }
     ]});
     await testDb.membership.createMany({ data: [
       { userId: 'user-dealer', organizationId: 'org-a', role: 'DEALER_OWNER' },

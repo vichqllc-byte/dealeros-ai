@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { middleware } from '@/middleware';
+import { ACCESS_TOKEN_COOKIE } from '@/lib/security/cookies';
+import { createSignedToken } from '@/lib/security/tokens';
 
 function makeRequest(pathname: string, cookiesMap: Record<string, string> = {}) {
   return {
@@ -10,28 +12,29 @@ function makeRequest(pathname: string, cookiesMap: Record<string, string> = {}) 
 }
 
 describe('middleware auth lifecycle', () => {
-  it('returns json error for missing api token', () => {
-    const res = middleware(makeRequest('/api/vehicles')) as any;
+  it('returns json error for missing api token', async () => {
+    const res = (await middleware(makeRequest('/api/vehicles'))) as any;
     expect(res.status).toBe(401);
   });
 
-  it('returns json error for expired api token without refresh token', () => {
-    const res = middleware(makeRequest('/api/vehicles', { 'sb-access-token': 'expired' })) as any;
+  it('returns json error for a tampered/forged api token', async () => {
+    const res = (await middleware(makeRequest('/api/vehicles', { [ACCESS_TOKEN_COOKIE]: 'forged.signature' }))) as any;
     expect(res.status).toBe(401);
   });
 
-  it('returns json error for invalid api token', () => {
-    const res = middleware(makeRequest('/api/vehicles', { 'sb-access-token': 'invalid' })) as any;
+  it('returns json error for a malformed api token', async () => {
+    const res = (await middleware(makeRequest('/api/vehicles', { [ACCESS_TOKEN_COOKIE]: 'not-a-valid-token-shape' }))) as any;
     expect(res.status).toBe(401);
   });
 
-  it('redirects protected page for missing token', () => {
-    const res = middleware(makeRequest('/dealer')) as any;
+  it('redirects protected page for missing token', async () => {
+    const res = (await middleware(makeRequest('/dealer'))) as any;
     expect(res.status).toBe(307);
   });
 
-  it('allows request when refresh token exists with expired access token', () => {
-    const res = middleware(makeRequest('/dealer', { 'sb-access-token': 'expired', 'sb-refresh-token': 'refresh-ok' })) as any;
+  it('allows request through when the access token has a genuine signature', async () => {
+    const { token } = await createSignedToken();
+    const res = (await middleware(makeRequest('/dealer', { [ACCESS_TOKEN_COOKIE]: token }))) as any;
     expect(res.status).toBe(200);
   });
 });

@@ -1,11 +1,11 @@
 generator client {
-  provider = "prisma-client-js"
+  provider      = "prisma-client-js"
   binaryTargets = ["native", "windows"]
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
   directUrl = env("DIRECT_URL")
 }
 
@@ -35,25 +35,30 @@ enum RecommendationKey {
 }
 
 model Organization {
-  id            String       @id @default(cuid())
-  name          String
-  createdAt     DateTime     @default(now())
-  updatedAt     DateTime     @updatedAt
-  memberships   Membership[]
-  vehicles      Vehicle[]
-  auditLogs     AuditLog[]
-  activityLogs  ActivityLog[]
+  id           String        @id @default(cuid())
+  name         String
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  memberships  Membership[]
+  vehicles     Vehicle[]
+  auditLogs    AuditLog[]
+  activityLogs ActivityLog[]
 }
 
 model User {
-  id            String       @id @default(cuid())
-  email         String       @unique
-  firstName     String
-  lastName      String
-  createdAt     DateTime     @default(now())
-  updatedAt     DateTime     @updatedAt
-  memberships   Membership[]
-  auditEntries  AuditLog[]   @relation("AuditActor")
+  id                      String                   @id @default(cuid())
+  email                   String                   @unique
+  firstName               String
+  lastName                String
+  passwordHash            String
+  emailVerifiedAt         DateTime?
+  createdAt               DateTime                 @default(now())
+  updatedAt               DateTime                 @updatedAt
+  memberships             Membership[]
+  auditEntries            AuditLog[]               @relation("AuditActor")
+  sessions                Session[]
+  passwordResetTokens     PasswordResetToken[]
+  emailVerificationTokens EmailVerificationToken[]
 }
 
 model Membership {
@@ -70,80 +75,120 @@ model Membership {
 }
 
 model Vehicle {
-  id               String        @id @default(cuid())
-  organizationId   String
-  vin              String        @unique
-  year             Int?
-  make             String?
-  model            String?
-  trim             String?
-  mileage          Int?
-  status           VehicleStatus @default(NEW)
-  workflowState    String?
-  createdAt        DateTime      @default(now())
-  updatedAt        DateTime      @updatedAt
-  organization     Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  vinAnalyses      VinAnalysis[]
+  id             String        @id @default(cuid())
+  organizationId String
+  vin            String        @unique
+  year           Int?
+  make           String?
+  model          String?
+  trim           String?
+  mileage        Int?
+  status         VehicleStatus @default(NEW)
+  workflowState  String?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+  organization   Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  vinAnalyses    VinAnalysis[]
 
   @@index([organizationId, status])
 }
 
 model VinAnalysis {
-  id                 String            @id @default(cuid())
-  vehicleId          String
-  decodedPayload     Json
-  manualCorrections  Json?
-  marketValue        Decimal?          @db.Decimal(12, 2)
-  wholesaleValue     Decimal?          @db.Decimal(12, 2)
-  retailValue        Decimal?          @db.Decimal(12, 2)
-  transportEstimate  Decimal?          @db.Decimal(12, 2)
-  repairEstimate     Decimal?          @db.Decimal(12, 2)
-  feesEstimate       Decimal?          @db.Decimal(12, 2)
-  taxesEstimate      Decimal?          @db.Decimal(12, 2)
-  projectedRoi       Decimal?          @db.Decimal(12, 2)
-  confidenceScore    Float?
-  riskSummary        String?
-  aiExplanation      String?
-  recommendation     RecommendationKey?
-  workflowState      String?
-  createdAt          DateTime          @default(now())
-  updatedAt          DateTime          @updatedAt
-  vehicle            Vehicle           @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+  id                String             @id @default(cuid())
+  vehicleId         String
+  decodedPayload    Json
+  manualCorrections Json?
+  marketValue       Decimal?           @db.Decimal(12, 2)
+  wholesaleValue    Decimal?           @db.Decimal(12, 2)
+  retailValue       Decimal?           @db.Decimal(12, 2)
+  transportEstimate Decimal?           @db.Decimal(12, 2)
+  repairEstimate    Decimal?           @db.Decimal(12, 2)
+  feesEstimate      Decimal?           @db.Decimal(12, 2)
+  taxesEstimate     Decimal?           @db.Decimal(12, 2)
+  projectedRoi      Decimal?           @db.Decimal(12, 2)
+  confidenceScore   Float?
+  riskSummary       String?
+  aiExplanation     String?
+  recommendation    RecommendationKey?
+  workflowState     String?
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  vehicle           Vehicle            @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
 
   @@index([vehicleId, createdAt])
 }
 
-
-
 model ActivityLog {
-  id              String       @id @default(cuid())
-  organizationId  String
-  actorUserId     String?
-  entityType      String
-  entityId        String
-  type            String
-  summary         String
-  payload         Json?
-  createdAt       DateTime     @default(now())
-  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  id             String       @id @default(cuid())
+  organizationId String
+  actorUserId    String?
+  entityType     String
+  entityId       String
+  type           String
+  summary        String
+  payload        Json?
+  createdAt      DateTime     @default(now())
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   @@index([organizationId, createdAt])
   @@index([entityType, entityId])
 }
 
 model AuditLog {
-  id              String       @id @default(cuid())
-  organizationId  String
-  actorUserId     String?
-  action          String
-  entityType      String
-  entityId        String
-  beforeState     Json?
-  afterState      Json?
-  createdAt       DateTime     @default(now())
-  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  actor           User?        @relation("AuditActor", fields: [actorUserId], references: [id], onDelete: SetNull)
+  id             String       @id @default(cuid())
+  organizationId String
+  actorUserId    String?
+  action         String
+  entityType     String
+  entityId       String
+  beforeState    Json?
+  afterState     Json?
+  createdAt      DateTime     @default(now())
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  actor          User?        @relation("AuditActor", fields: [actorUserId], references: [id], onDelete: SetNull)
 
   @@index([organizationId, createdAt])
   @@index([entityType, entityId])
+}
+
+model Session {
+  id               String    @id @default(cuid())
+  userId           String
+  accessTokenHash  String    @unique
+  refreshTokenHash String    @unique
+  rememberMe       Boolean   @default(false)
+  userAgent        String?
+  ipAddress        String?
+  accessExpiresAt  DateTime
+  refreshExpiresAt DateTime
+  revokedAt        DateTime?
+  createdAt        DateTime  @default(now())
+  lastUsedAt       DateTime  @default(now())
+  user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model PasswordResetToken {
+  id        String    @id @default(cuid())
+  userId    String
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model EmailVerificationToken {
+  id        String    @id @default(cuid())
+  userId    String
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }

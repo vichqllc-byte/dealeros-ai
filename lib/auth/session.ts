@@ -1,6 +1,8 @@
 import { cache } from 'react';
+import { cookies } from 'next/headers';
 import { db } from '@/lib/db/client';
-import { createSupabaseServerClient, getSupabaseAuthState } from '@/lib/supabase/server';
+import { ACCESS_TOKEN_COOKIE } from '@/lib/security/cookies';
+import { hashSecret, verifySignedTokenIntegrity } from '@/lib/security/tokens';
 import { getTestSession } from '@/lib/test/session-adapter';
 
 export type AppRole = 'DEALER_OWNER' | 'DEALER_BUYER' | 'VENDOR_MANAGER' | 'ADMIN';
@@ -10,7 +12,7 @@ export type AuthSession = {
   organizationId: string;
   role: AppRole;
   email: string;
-  supabaseUserId: string;
+  sessionId: string;
 };
 
 export const getSession = cache(async (): Promise<AuthSession | null> => {
@@ -18,15 +20,16 @@ export const getSession = cache(async (): Promise<AuthSession | null> => {
     return getTestSession();
   }
 
-  const authState = await getSupabaseAuthState();
-  if (authState.state !== 'valid' || !authState.user?.email) return null;
+  const accessToken = cookies().get(ACCESS_TOKEN_COOKIE)?.value;
+  const tokenId = await verifySignedTokenIntegrity(accessToken);
+  if (!tokenId) return null;
 
-  const supabase = createSupabaseServerClient();
-  const { data, error } = await supabase.auth.getUser();
-  if (error || !data.user?.email) return null;
+  const accessTokenHash = await hashSecret(tokenId);
+  const session = await db.session.findUnique({ where: { accessTokenHash } });
+  if (!session || session.revokedAt || session.accessExpiresAt < new Date()) return null;
 
   const user = await db.user.findUnique({
-    where: { email: data.user.email },
+    where: { id: session.userId },
     include: { memberships: { orderBy: { createdAt: 'asc' } } }
   });
 
@@ -39,6 +42,6 @@ export const getSession = cache(async (): Promise<AuthSession | null> => {
     organizationId: membership.organizationId,
     role: membership.role,
     email: user.email,
-    supabaseUserId: data.user.id
+    sessionId: session.id
   };
 });

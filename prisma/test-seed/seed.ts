@@ -1,8 +1,12 @@
 import { PrismaClient, RoleKey, RecommendationKey, VehicleStatus } from '@prisma/client';
+import { hashPassword } from '../../lib/security/password';
 
 const prisma = new PrismaClient();
 
 async function main() {
+  await prisma.session.deleteMany();
+  await prisma.passwordResetToken.deleteMany();
+  await prisma.emailVerificationToken.deleteMany();
   await prisma.activityLog.deleteMany();
   await prisma.auditLog.deleteMany();
   await prisma.vinAnalysis.deleteMany();
@@ -14,10 +18,11 @@ async function main() {
   const orgA = await prisma.organization.create({ data: { id: 'org-a', name: 'Org A Motors' } });
   const orgB = await prisma.organization.create({ data: { id: 'org-b', name: 'Org B Auto Group' } });
 
-  const dealer = await prisma.user.create({ data: { id: 'user-dealer', email: 'dealer@test.com', firstName: 'Dealer', lastName: 'User' } });
-  const vendor = await prisma.user.create({ data: { id: 'user-vendor', email: 'vendor@test.com', firstName: 'Vendor', lastName: 'User' } });
-  const admin = await prisma.user.create({ data: { id: 'user-admin', email: 'admin@test.com', firstName: 'Admin', lastName: 'User' } });
-  const outsider = await prisma.user.create({ data: { id: 'user-outsider', email: 'out@test.com', firstName: 'Out', lastName: 'User' } });
+  const testPasswordHash = await hashPassword('Test-Fixture-Password-123!');
+  const dealer = await prisma.user.create({ data: { id: 'user-dealer', email: 'dealer@test.com', firstName: 'Dealer', lastName: 'User', passwordHash: testPasswordHash, emailVerifiedAt: new Date() } });
+  const vendor = await prisma.user.create({ data: { id: 'user-vendor', email: 'vendor@test.com', firstName: 'Vendor', lastName: 'User', passwordHash: testPasswordHash, emailVerifiedAt: new Date() } });
+  const admin = await prisma.user.create({ data: { id: 'user-admin', email: 'admin@test.com', firstName: 'Admin', lastName: 'User', passwordHash: testPasswordHash, emailVerifiedAt: new Date() } });
+  const outsider = await prisma.user.create({ data: { id: 'user-outsider', email: 'out@test.com', firstName: 'Out', lastName: 'User', passwordHash: testPasswordHash, emailVerifiedAt: new Date() } });
 
   await prisma.membership.createMany({ data: [
     { userId: dealer.id, organizationId: orgA.id, role: RoleKey.DEALER_OWNER },

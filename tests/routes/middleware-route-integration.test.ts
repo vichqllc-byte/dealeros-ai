@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { middleware } from '../../middleware';
+import { ACCESS_TOKEN_COOKIE } from '@/lib/security/cookies';
+import { createSignedToken } from '@/lib/security/tokens';
 
 function makeRequest(pathname: string, cookiesMap: Record<string, string> = {}) {
   return {
@@ -10,43 +12,46 @@ function makeRequest(pathname: string, cookiesMap: Record<string, string> = {}) 
 }
 
 describe('middleware route integration', () => {
-  it('missing token returns json error for protected api', () => {
-    const res = middleware(makeRequest('/api/vehicles')) as any;
+  it('missing token returns json error for protected api', async () => {
+    const res = (await middleware(makeRequest('/api/vehicles'))) as any;
     expect(res.status).toBe(401);
   });
 
-  it('expired token returns json error for protected api', () => {
-    const res = middleware(makeRequest('/api/vehicles', { 'sb-access-token': 'expired' })) as any;
+  it('forged token returns json error for protected api', async () => {
+    const res = (await middleware(makeRequest('/api/vehicles', { [ACCESS_TOKEN_COOKIE]: 'forged.signature' }))) as any;
     expect(res.status).toBe(401);
   });
 
-  it('invalid token returns json error for protected api', () => {
-    const res = middleware(makeRequest('/api/vehicles', { 'sb-access-token': 'invalid' })) as any;
+  it('malformed token returns json error for protected api', async () => {
+    const res = (await middleware(makeRequest('/api/vehicles', { [ACCESS_TOKEN_COOKIE]: 'not-a-token' }))) as any;
     expect(res.status).toBe(401);
   });
 
-  it('valid dealer token passes protected api', () => {
-    const res = middleware(makeRequest('/api/vehicles', { 'sb-access-token': 'valid-dealer' })) as any;
+  it('genuinely signed token passes protected api boundary', async () => {
+    const { token } = await createSignedToken();
+    const res = (await middleware(makeRequest('/api/vehicles', { [ACCESS_TOKEN_COOKIE]: token }))) as any;
     expect(res.status).toBe(200);
   });
 
-  it('valid vendor token passes middleware boundary', () => {
-    const res = middleware(makeRequest('/api/vin-analyses', { 'sb-access-token': 'valid-vendor' })) as any;
+  it('genuinely signed token passes vin-analyses boundary', async () => {
+    const { token } = await createSignedToken();
+    const res = (await middleware(makeRequest('/api/vin-analyses', { [ACCESS_TOKEN_COOKIE]: token }))) as any;
     expect(res.status).toBe(200);
   });
 
-  it('valid admin token passes middleware boundary', () => {
-    const res = middleware(makeRequest('/admin', { 'sb-access-token': 'valid-admin' })) as any;
+  it('genuinely signed token passes admin page boundary', async () => {
+    const { token } = await createSignedToken();
+    const res = (await middleware(makeRequest('/admin', { [ACCESS_TOKEN_COOKIE]: token }))) as any;
     expect(res.status).toBe(200);
   });
 
-  it('protected page redirects safely when missing token', () => {
-    const res = middleware(makeRequest('/dealer')) as any;
+  it('protected page redirects safely when missing token', async () => {
+    const res = (await middleware(makeRequest('/dealer'))) as any;
     expect(res.status).toBe(307);
   });
 
-  it('does not redirect public home page', () => {
-    const res = middleware(makeRequest('/')) as any;
+  it('does not redirect public home page', async () => {
+    const res = (await middleware(makeRequest('/'))) as any;
     expect(res.status).toBe(200);
   });
 });
