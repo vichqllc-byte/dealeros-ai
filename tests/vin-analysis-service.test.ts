@@ -12,14 +12,31 @@ vi.mock('@/lib/db/client', () => ({
   db: {
     vehicle: {
       findFirst: vi.fn(async ({ where }) => state.vehicles.find((v) => v.id === where.id && v.organizationId === where.organizationId) || null),
-      update: vi.fn(async ({ where, data }) => { const row = state.vehicles.find((v) => v.id === where.id); Object.assign(row, data); return row; })
+      updateMany: vi.fn(async ({ where, data }) => {
+        const rows = state.vehicles.filter((v) => v.id === where.id && v.organizationId === where.organizationId);
+        rows.forEach((row) => Object.assign(row, data));
+        return { count: rows.length };
+      })
     },
     vinAnalysis: {
       findMany: vi.fn(async ({ where }) => state.vinAnalyses.filter((a) => state.vehicles.find((v) => v.id === a.vehicleId)?.organizationId === where.vehicle.organizationId)),
       findFirst: vi.fn(async ({ where }) => state.vinAnalyses.find((a) => a.id === where.id && state.vehicles.find((v) => v.id === a.vehicleId)?.organizationId === where.vehicle.organizationId) || null),
+      findFirstOrThrow: vi.fn(async ({ where }) => {
+        const row = state.vinAnalyses.find((a) => a.id === where.id && state.vehicles.find((v) => v.id === a.vehicleId)?.organizationId === where.vehicle.organizationId);
+        if (!row) throw new Error('Record not found');
+        return { ...row };
+      }),
       create: vi.fn(async ({ data }) => { const row = { id: `vin-${state.vinAnalyses.length + 1}`, ...data }; state.vinAnalyses.push(row); return { ...row }; }),
-      update: vi.fn(async ({ where, data }) => { const row = state.vinAnalyses.find((a) => a.id === where.id); Object.assign(row, data); return { ...row }; }),
-      delete: vi.fn(async ({ where }) => { const idx = state.vinAnalyses.findIndex((a) => a.id === where.id); const [row] = state.vinAnalyses.splice(idx, 1); return row; })
+      updateMany: vi.fn(async ({ where, data }) => {
+        const rows = state.vinAnalyses.filter((a) => a.id === where.id && state.vehicles.find((v) => v.id === a.vehicleId)?.organizationId === where.vehicle.organizationId);
+        rows.forEach((row) => Object.assign(row, data));
+        return { count: rows.length };
+      }),
+      deleteMany: vi.fn(async ({ where }) => {
+        const before = state.vinAnalyses.length;
+        state.vinAnalyses = state.vinAnalyses.filter((a) => !(a.id === where.id && state.vehicles.find((v) => v.id === a.vehicleId)?.organizationId === where.vehicle.organizationId));
+        return { count: before - state.vinAnalyses.length };
+      })
     },
     auditLog: { create: vi.fn(async ({ data }) => { state.auditLogs.push(data); return data; }) },
     activityLog: { create: vi.fn(async ({ data }) => { state.activityLogs.push(data); return data; }) }

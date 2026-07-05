@@ -4,8 +4,8 @@ import { requireSession } from '@/lib/server/require-session';
 import { loadVendorDashboard } from '@/lib/loaders/dashboard';
 
 export default async function VendorPage() {
-  await requireSession(['VENDOR_MANAGER', 'ADMIN']);
-  const data = await loadVendorDashboard();
+  const session = await requireSession(['VENDOR_MANAGER', 'ADMIN']);
+  const data = await loadVendorDashboard(session.organizationId);
 
   return (
     <DashboardShell title="Vendor Workspace" subtitle="Quote requests, repair estimates, scheduling, and communication.">

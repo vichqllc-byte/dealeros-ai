@@ -13,9 +13,22 @@ vi.mock('@/lib/db/client', () => ({
     vehicle: {
       findMany: vi.fn(async ({ where }) => state.vehicles.filter((v) => v.organizationId === where.organizationId)),
       findFirst: vi.fn(async ({ where }) => state.vehicles.find((v) => v.id === where.id && v.organizationId === where.organizationId) || null),
+      findFirstOrThrow: vi.fn(async ({ where }) => {
+        const row = state.vehicles.find((v) => v.id === where.id && v.organizationId === where.organizationId);
+        if (!row) throw new Error('Record not found');
+        return { ...row };
+      }),
       create: vi.fn(async ({ data }) => { const row = { id: `veh-${state.vehicles.length + 1}`, status: 'NEW', ...data }; state.vehicles.push(row); return { ...row }; }),
-      update: vi.fn(async ({ where, data }) => { const row = state.vehicles.find((v) => v.id === where.id); Object.assign(row, data); return { ...row }; }),
-      delete: vi.fn(async ({ where }) => { const idx = state.vehicles.findIndex((v) => v.id === where.id); const [row] = state.vehicles.splice(idx, 1); return row; })
+      updateMany: vi.fn(async ({ where, data }) => {
+        const rows = state.vehicles.filter((v) => v.id === where.id && v.organizationId === where.organizationId);
+        rows.forEach((row) => Object.assign(row, data));
+        return { count: rows.length };
+      }),
+      deleteMany: vi.fn(async ({ where }) => {
+        const before = state.vehicles.length;
+        state.vehicles = state.vehicles.filter((v) => !(v.id === where.id && v.organizationId === where.organizationId));
+        return { count: before - state.vehicles.length };
+      })
     },
     auditLog: { create: vi.fn(async ({ data }) => { state.auditLogs.push(data); return data; }) },
     activityLog: { create: vi.fn(async ({ data }) => { state.activityLogs.push(data); return data; }) }

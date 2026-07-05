@@ -28,11 +28,11 @@ export async function loadDealerDashboard(organizationId: string) {
   return { vehicleCount, analyzedCount, recentVehicles, analyses, activity, opportunities };
 }
 
-export async function loadVendorDashboard() {
+export async function loadVendorDashboard(organizationId: string) {
   const [quoteRequestsOpen, activeJobs, recentMessages] = await Promise.all([
-    db.vehicle.count({ where: { status: 'ANALYZED' } }),
-    db.vehicle.count({ where: { status: 'NEGOTIATING' } }),
-    db.activityLog.findMany({ orderBy: { createdAt: 'desc' }, take: 5 })
+    db.vehicle.count({ where: { organizationId, status: 'ANALYZED' } }),
+    db.vehicle.count({ where: { organizationId, status: 'NEGOTIATING' } }),
+    db.activityLog.findMany({ where: { organizationId }, orderBy: { createdAt: 'desc' }, take: 5 })
   ]);
 
   return {
@@ -42,15 +42,22 @@ export async function loadVendorDashboard() {
   };
 }
 
-export async function loadAdminDashboard() {
-  const [organizationCount, userCount, vehicleCount, auditCount, recentActivity, recentAudit] = await Promise.all([
-    db.organization.count(),
-    db.user.count(),
-    db.vehicle.count(),
-    db.auditLog.count(),
-    db.activityLog.findMany({ orderBy: { createdAt: 'desc' }, take: 5 }),
-    db.auditLog.findMany({ orderBy: { createdAt: 'desc' }, take: 5 })
+export async function loadAdminDashboard(organizationId: string) {
+  const [organization, userCount, vehicleCount, auditCount, recentActivity, recentAudit] = await Promise.all([
+    db.organization.findUnique({ where: { id: organizationId } }),
+    db.membership.count({ where: { organizationId } }),
+    db.vehicle.count({ where: { organizationId } }),
+    db.auditLog.count({ where: { organizationId } }),
+    db.activityLog.findMany({ where: { organizationId }, orderBy: { createdAt: 'desc' }, take: 5 }),
+    db.auditLog.findMany({ where: { organizationId }, orderBy: { createdAt: 'desc' }, take: 5 })
   ]);
 
-  return { organizationCount, userCount, vehicleCount, auditCount, recentActivity, recentAudit };
+  return {
+    organizationName: organization?.name ?? 'Unknown organization',
+    userCount,
+    vehicleCount,
+    auditCount,
+    recentActivity,
+    recentAudit
+  };
 }
