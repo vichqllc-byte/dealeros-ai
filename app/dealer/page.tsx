@@ -11,6 +11,14 @@ import { ReconditioningChecklistPanel } from '@/components/modules/reconditionin
 import { requireSession } from '@/lib/server/require-session';
 import { loadDealerDashboard } from '@/lib/loaders/dashboard';
 import { summarizeWorkflowStates } from '@/lib/ai/workflow-summary';
+import { reconditioningService } from '@/lib/vin-intelligence/services/reconditioning-service';
+import type { DecodedVehicle } from '@/lib/vin-intelligence/types';
+
+function toDamageSeverity(repairEstimate: number): 'Low' | 'Medium' | 'High' {
+  if (repairEstimate > 2500) return 'High';
+  if (repairEstimate > 1000) return 'Medium';
+  return 'Low';
+}
 
 export default async function DealerPage() {
   const session = await requireSession(['DEALER_OWNER', 'DEALER_BUYER', 'ADMIN']);
@@ -18,6 +26,81 @@ export default async function DealerPage() {
   try {
     const data = await loadDealerDashboard(session.organizationId);
     const workflowSummary = summarizeWorkflowStates(data.recentVehicles, data.analyses);
+
+    const analysesWithNumbers = data.analyses.map((item) => ({
+      ...item,
+      marketValue: item.marketValue ? Number(item.marketValue) : null,
+      wholesaleValue: item.wholesaleValue ? Number(item.wholesaleValue) : null,
+      retailValue: item.retailValue ? Number(item.retailValue) : null,
+      transportEstimate: item.transportEstimate ? Number(item.transportEstimate) : null,
+      repairEstimate: item.repairEstimate ? Number(item.repairEstimate) : null,
+      feesEstimate: item.feesEstimate ? Number(item.feesEstimate) : null
+    }));
+
+    const damageItems = analysesWithNumbers
+      .filter((a) => a.repairEstimate != null && a.repairEstimate > 0)
+      .map((a) => ({
+        id: a.id,
+        title: `${a.vehicle.vin} repair estimate`,
+        severity: toDamageSeverity(a.repairEstimate!),
+        estimate: a.repairEstimate,
+        confidence: a.confidenceScore ?? 0.7
+      }));
+
+    const auctionItems = analysesWithNumbers
+      .filter((a) => a.retailValue != null)
+      .map((a) => ({
+        id: a.id,
+        title: a.vehicle.vin,
+        purchasePrice: a.wholesaleValue ?? 0,
+        repairEstimate: a.repairEstimate ?? 0,
+        transportCost: a.transportEstimate ?? 0,
+        auctionFees: a.feesEstimate ?? 0,
+        expectedRetailPrice: a.retailValue!,
+        demandScore: a.confidenceScore ?? 0.6
+      }));
+
+    const repairItems = damageItems.map((item) => ({
+      id: item.id,
+      title: item.title,
+      // Reverse-derived so the panel's internal cost formula (laborHours *
+      // rate + materialCost + paintCost) reproduces the real, stored
+      // repairEstimate rather than substituting a fake default estimate.
+      laborHours: (item.estimate ?? 0) / 95,
+      materialCost: 0,
+      paintCost: 0,
+      urgency: item.severity
+    }));
+
+    const pricingItems = analysesWithNumbers
+      .filter((a) => a.retailValue != null)
+      .map((a) => ({
+        title: a.vehicle.vin,
+        retailPrice: a.retailValue!,
+        repairCost: a.repairEstimate ?? 0,
+        transportCost: a.transportEstimate ?? 0,
+        fees: a.feesEstimate ?? 0
+      }));
+
+    const reconditioningVehicle = data.recentVehicles[0];
+    const reconditioningTasks = reconditioningVehicle
+      ? reconditioningService.buildPlan({
+          mileageMiles: reconditioningVehicle.mileage ?? 0,
+          decoded: {
+            vin: reconditioningVehicle.vin,
+            make: reconditioningVehicle.make,
+            model: reconditioningVehicle.model,
+            modelYear: reconditioningVehicle.year,
+            trim: null, series: null, bodyClass: null, driveType: null, transmissionStyle: null,
+            transmissionSpeeds: null, engineCylinders: null, engineDisplacementLiters: null,
+            engineHorsepower: null, engineManufacturer: null, fuelTypePrimary: null, doors: null,
+            plantCity: null, plantCountry: null, factoryOptions: [], safetyEquipment: [],
+            decodeErrorCode: null, decodeErrorText: null, decodeCompletenessPercent: 0, raw: {}
+          } satisfies DecodedVehicle,
+          riskLevel: 'Low'
+        }).value.tasks
+      : [];
+
     return (
       <DashboardShell title="Dealer Workspace" subtitle="Acquisition pipeline, VIN analysis, sourcing, and profit view.">
         <div className="grid gap-6">
@@ -39,77 +122,17 @@ export default async function DealerPage() {
 
           <div className="grid gap-4 lg:grid-cols-2">
             <VinIntelligencePanel items={data.recentVehicles.map((vehicle) => ({ vin: vehicle.vin, mileage: vehicle.mileage, status: vehicle.status }))} />
-            <DamageAnalysisPanel items={[
-              { id: 'damage-1', title: 'Front bumper impact', severity: 'Medium', estimate: 1800, confidence: 0.84 },
-              { id: 'damage-2', title: 'Rear quarter panel', severity: 'High', estimate: 3200, confidence: 0.79 }
-            ]} />
+            <DamageAnalysisPanel items={damageItems} />
           </div>
 
           <div className="grid gap-4 lg:grid-cols-2">
-            <AuctionCalculatorPanel items={[
-              {
-                id: 'lane-1',
-                title: '2020 Civic EX',
-                purchasePrice: 9000,
-                repairEstimate: 1800,
-                transportCost: 450,
-                auctionFees: 600,
-                expectedRetailPrice: 14500,
-                demandScore: 0.8
-              },
-              {
-                id: 'lane-2',
-                title: '2018 Corolla LE',
-                purchasePrice: 7200,
-                repairEstimate: 1400,
-                transportCost: 400,
-                auctionFees: 550,
-                expectedRetailPrice: 11800,
-                demandScore: 0.65
-              }
-            ]} />
-            <RepairEstimatorPanel items={[
-              {
-                id: 'repair-1',
-                title: 'Front bumper impact',
-                laborHours: 6,
-                materialCost: 850,
-                paintCost: 450,
-                urgency: 'Medium'
-              },
-              {
-                id: 'repair-2',
-                title: 'Rear quarter panel',
-                laborHours: 8,
-                materialCost: 1200,
-                paintCost: 700,
-                urgency: 'High'
-              }
-            ]} />
+            <AuctionCalculatorPanel items={auctionItems} />
+            <RepairEstimatorPanel items={repairItems} />
           </div>
 
           <div className="grid gap-4 lg:grid-cols-2">
-            <PricingSummaryPanel items={[
-              {
-                title: '2020 Civic EX',
-                retailPrice: 14500,
-                repairCost: 1800,
-                transportCost: 450,
-                fees: 600
-              },
-              {
-                title: '2018 Corolla LE',
-                retailPrice: 11800,
-                repairCost: 1400,
-                transportCost: 400,
-                fees: 550
-              }
-            ]} />
-            <ReconditioningChecklistPanel items={[
-              { id: 'task-1', title: 'Detail vehicle', completed: true },
-              { id: 'task-2', title: 'Replace tires', completed: false },
-              { id: 'task-3', title: 'Photograph unit', completed: false }
-            ]} />
+            <PricingSummaryPanel items={pricingItems} />
+            <ReconditioningChecklistPanel items={reconditioningTasks} />
           </div>
 
           <div className="grid gap-4 lg:grid-cols-2">

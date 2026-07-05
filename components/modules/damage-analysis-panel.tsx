@@ -19,7 +19,7 @@ export function DamageAnalysisPanel({ items }: DamageAnalysisPanelProps) {
           <h3 className="text-lg font-semibold">AI Damage Analysis</h3>
           <p className="text-sm text-neutral-600">Damage triage and repair-cost estimates for incoming inventory.</p>
         </div>
-        <Badge>Mock AI</Badge>
+        <Badge>Live DB</Badge>
       </div>
       <div className="grid gap-3">
         {results.map((item) => (
