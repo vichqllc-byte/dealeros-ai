@@ -34,15 +34,100 @@ enum RecommendationKey {
   PASS
 }
 
+enum LeadStatus {
+  NEW
+  CONTACTED
+  QUALIFIED
+  NEGOTIATING
+  WON
+  LOST
+}
+
+enum TaskStatus {
+  PENDING
+  COMPLETED
+  CANCELLED
+}
+
+enum AppointmentStatus {
+  SCHEDULED
+  COMPLETED
+  CANCELLED
+  NO_SHOW
+}
+
+enum CommunicationChannel {
+  EMAIL
+  SMS
+  PHONE
+  IN_PERSON
+  OTHER
+}
+
+enum CommunicationDirection {
+  INBOUND
+  OUTBOUND
+}
+
+enum InspectionCondition {
+  EXCELLENT
+  GOOD
+  FAIR
+  POOR
+}
+
+enum ListingStatus {
+  DRAFT
+  PUBLISHED
+  UNPUBLISHED
+}
+
+enum SaleStatus {
+  PENDING
+  COMPLETED
+  CANCELLED
+}
+
+enum FinancingStatus {
+  PENDING
+  APPROVED
+  DECLINED
+  WITHDRAWN
+}
+
+enum SaleDocumentType {
+  PURCHASE_AGREEMENT
+  BUYER_DISCLOSURE
+  DELIVERY_CHECKLIST
+  OTHER
+}
+
+enum SignatureStatus {
+  UNSIGNED
+  AWAITING_PROVIDER
+  SIGNED
+}
+
 model Organization {
-  id           String        @id @default(cuid())
-  name         String
-  createdAt    DateTime      @default(now())
-  updatedAt    DateTime      @updatedAt
-  memberships  Membership[]
-  vehicles     Vehicle[]
-  auditLogs    AuditLog[]
-  activityLogs ActivityLog[]
+  id                String                  @id @default(cuid())
+  name              String
+  createdAt         DateTime                @default(now())
+  updatedAt         DateTime                @updatedAt
+  memberships       Membership[]
+  vehicles          Vehicle[]
+  auditLogs         AuditLog[]
+  activityLogs      ActivityLog[]
+  customers         Customer[]
+  leads             Lead[]
+  tasks             Task[]
+  notes             Note[]
+  communications    CommunicationLogEntry[]
+  appointments      Appointment[]
+  emailTemplates    EmailTemplate[]
+  inspectionReports InspectionReport[]
+  priceRecords      PriceRecord[]
+  listings          Listing[]
+  sales             Sale[]
 }
 
 model User {
@@ -75,20 +160,25 @@ model Membership {
 }
 
 model Vehicle {
-  id             String        @id @default(cuid())
-  organizationId String
-  vin            String        @unique
-  year           Int?
-  make           String?
-  model          String?
-  trim           String?
-  mileage        Int?
-  status         VehicleStatus @default(NEW)
-  workflowState  String?
-  createdAt      DateTime      @default(now())
-  updatedAt      DateTime      @updatedAt
-  organization   Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  vinAnalyses    VinAnalysis[]
+  id                String             @id @default(cuid())
+  organizationId    String
+  vin               String             @unique
+  year              Int?
+  make              String?
+  model             String?
+  trim              String?
+  mileage           Int?
+  status            VehicleStatus      @default(NEW)
+  workflowState     String?
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  organization      Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  vinAnalyses       VinAnalysis[]
+  leads             Lead[]
+  inspectionReports InspectionReport[]
+  priceRecords      PriceRecord[]
+  listings          Listing[]
+  sales             Sale[]
 
   @@index([organizationId, status])
 }
@@ -191,4 +281,259 @@ model EmailVerificationToken {
   user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
+}
+
+// ---------------------------------------------------------------------
+// CRM
+// ---------------------------------------------------------------------
+
+model Customer {
+  id             String   @id @default(cuid())
+  organizationId String
+  firstName      String
+  lastName       String
+  email          String?
+  phone          String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization   Organization            @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  leads          Lead[]
+  tasks          Task[]
+  notes          Note[]
+  communications CommunicationLogEntry[]
+  appointments   Appointment[]
+  sales          Sale[]
+
+  @@index([organizationId])
+}
+
+model Lead {
+  id             String     @id @default(cuid())
+  organizationId String
+  customerId     String
+  vehicleId      String?
+  status         LeadStatus @default(NEW)
+  source         String?
+  ownerUserId    String?
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+
+  organization   Organization            @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  customer       Customer                @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  vehicle        Vehicle?                @relation(fields: [vehicleId], references: [id], onDelete: SetNull)
+  tasks          Task[]
+  notes          Note[]
+  communications CommunicationLogEntry[]
+  appointments   Appointment[]
+
+  @@index([organizationId, status])
+  @@index([customerId])
+}
+
+model Task {
+  id             String     @id @default(cuid())
+  organizationId String
+  leadId         String?
+  customerId     String?
+  assignedUserId String?
+  title          String
+  dueAt          DateTime?
+  status         TaskStatus @default(PENDING)
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  lead         Lead?        @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  customer     Customer?    @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, status, dueAt])
+}
+
+model Note {
+  id             String   @id @default(cuid())
+  organizationId String
+  leadId         String?
+  customerId     String?
+  authorUserId   String?
+  body           String
+  createdAt      DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  lead         Lead?        @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  customer     Customer?    @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, createdAt])
+}
+
+model CommunicationLogEntry {
+  id             String                 @id @default(cuid())
+  organizationId String
+  leadId         String?
+  customerId     String?
+  channel        CommunicationChannel
+  direction      CommunicationDirection
+  summary        String
+  createdAt      DateTime               @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  lead         Lead?        @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  customer     Customer?    @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, createdAt])
+}
+
+model Appointment {
+  id             String            @id @default(cuid())
+  organizationId String
+  leadId         String?
+  customerId     String?
+  title          String
+  scheduledAt    DateTime
+  status         AppointmentStatus @default(SCHEDULED)
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  lead         Lead?        @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  customer     Customer?    @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, scheduledAt])
+}
+
+model EmailTemplate {
+  id             String   @id @default(cuid())
+  organizationId String
+  name           String
+  subject        String
+  body           String
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, name])
+}
+
+// ---------------------------------------------------------------------
+// Inventory workflows
+// ---------------------------------------------------------------------
+
+model InspectionReport {
+  id               String              @id @default(cuid())
+  organizationId   String
+  vehicleId        String
+  inspectorUserId  String?
+  overallCondition InspectionCondition
+  findings         Json
+  createdAt        DateTime            @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  vehicle      Vehicle      @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, vehicleId])
+}
+
+model PriceRecord {
+  id             String   @id @default(cuid())
+  organizationId String
+  vehicleId      String
+  price          Decimal  @db.Decimal(12, 2)
+  reason         String?
+  setByUserId    String?
+  createdAt      DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  vehicle      Vehicle      @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, vehicleId, createdAt])
+}
+
+model Listing {
+  id             String        @id @default(cuid())
+  organizationId String
+  vehicleId      String
+  channel        String
+  status         ListingStatus @default(DRAFT)
+  publishedAt    DateTime?
+  url            String?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  vehicle      Vehicle      @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, vehicleId])
+}
+
+// ---------------------------------------------------------------------
+// Sales
+// ---------------------------------------------------------------------
+
+model Sale {
+  id             String     @id @default(cuid())
+  organizationId String
+  vehicleId      String
+  customerId     String
+  salePrice      Decimal    @db.Decimal(12, 2)
+  saleDate       DateTime?
+  status         SaleStatus @default(PENDING)
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+
+  organization          Organization           @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  vehicle               Vehicle                @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+  customer              Customer               @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  tradeIns              TradeInVehicle[]
+  financingApplications FinancingApplication[]
+  documents             SaleDocument[]
+
+  @@index([organizationId, status])
+  @@index([vehicleId])
+}
+
+model TradeInVehicle {
+  id             String   @id @default(cuid())
+  saleId         String
+  vin            String?
+  year           Int?
+  make           String?
+  model          String?
+  mileage        Int?
+  appraisedValue Decimal  @db.Decimal(12, 2)
+  payoffAmount   Decimal? @db.Decimal(12, 2)
+  createdAt      DateTime @default(now())
+
+  sale Sale @relation(fields: [saleId], references: [id], onDelete: Cascade)
+
+  @@index([saleId])
+}
+
+model FinancingApplication {
+  id         String          @id @default(cuid())
+  saleId     String
+  lenderName String?
+  principal  Decimal         @db.Decimal(12, 2)
+  apr        Float
+  termMonths Int
+  status     FinancingStatus @default(PENDING)
+  createdAt  DateTime        @default(now())
+  updatedAt  DateTime        @updatedAt
+
+  sale Sale @relation(fields: [saleId], references: [id], onDelete: Cascade)
+
+  @@index([saleId])
+}
+
+model SaleDocument {
+  id              String           @id @default(cuid())
+  saleId          String
+  type            SaleDocumentType
+  signatureStatus SignatureStatus  @default(UNSIGNED)
+  signedAt        DateTime?
+  createdAt       DateTime         @default(now())
+
+  sale Sale @relation(fields: [saleId], references: [id], onDelete: Cascade)
+
+  @@index([saleId, type])
 }
