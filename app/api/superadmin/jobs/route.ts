@@ -9,7 +9,10 @@ export async function GET() {
       db.job.findMany({ orderBy: { createdAt: 'desc' }, take: 50 }),
       db.job.groupBy({ by: ['status'], _count: { _all: true } })
     ]);
-    return ok({ recentJobs, byStatus: byStatus.map((row) => ({ status: row.status, count: row._count._all })) });
+    return ok({
+      recentJobs,
+      byStatus: byStatus.map((row: (typeof byStatus)[number]) => ({ status: row.status, count: row._count._all }))
+    });
   } catch (error) {
     return handleRouteError(error);
   }
