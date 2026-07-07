@@ -25,7 +25,7 @@ function authErrorResponse(message: string, status = 401) {
  */
 export async function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
-  if (pathname === '/' || publicPrefixes.some((prefix) => pathname.startsWith(prefix))) {
+  if (pathname === '/' || publicPaths.some((prefix) => pathname.startsWith(prefix))) {
     return NextResponse.next();
   }
 
