@@ -22,7 +22,7 @@ export default async function AnalyticsPage() {
         <Card>
           <div className="text-sm font-semibold text-neutral-700">Deal stage breakdown</div>
           <div className="mt-3 space-y-2">
-            {Object.entries(analytics.stageBreakdown).map(([stage, count]) => (
+            {Object.entries(analytics.stageBreakdown as Record<string, number>).map(([stage, count]) => (
               <div key={stage} className="flex items-center gap-3">
                 <div className="w-28 text-xs uppercase tracking-[0.15em] text-neutral-500">{stage}</div>
                 <div className="h-2 flex-1 rounded bg-neutral-200">
@@ -37,7 +37,7 @@ export default async function AnalyticsPage() {
         <Card>
           <div className="text-sm font-semibold text-neutral-700">Marketplace channel status</div>
           <ul className="mt-3 space-y-2 text-sm text-neutral-700">
-            {Object.entries(analytics.channelBreakdown).map(([key, count]) => (
+            {Object.entries(analytics.channelBreakdown as Record<string, number>).map(([key, count]) => (
               <li key={key} className="flex items-center justify-between rounded-lg border border-border px-3 py-2">
                 <span>{key}</span>
                 <span className="font-semibold">{count}</span>
