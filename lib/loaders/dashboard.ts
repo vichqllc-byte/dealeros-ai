@@ -42,7 +42,7 @@ export async function loadVendorDashboard(organizationId: string) {
   return {
     quoteRequestsOpen,
     activeJobs,
-    recentMessages: recentMessages.map((item) => ({ id: item.id, body: item.summary }))
+    recentMessages: recentMessages.map((item: (typeof recentMessages)[number]) => ({ id: item.id, body: item.summary }))
   };
 }
 
