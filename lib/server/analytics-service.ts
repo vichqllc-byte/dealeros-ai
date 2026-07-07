@@ -11,16 +11,16 @@ export async function getAnalyticsForOrg(organizationId: string) {
     db.listingPost.findMany({ where: { organizationId }, select: { channel: true, status: true } })
   ]);
 
-  const stageBreakdown = deals.reduce<Record<string, number>>((acc, item) => {
+  const stageBreakdown = deals.reduce((acc: Record<string, number>, item: any) => {
     acc[item.stage] = (acc[item.stage] ?? 0) + 1;
     return acc;
-  }, {});
+  }, {} as Record<string, number>);
 
-  const channelBreakdown = listings.reduce<Record<string, number>>((acc, item) => {
+  const channelBreakdown = listings.reduce((acc: Record<string, number>, item: any) => {
     const key = `${item.channel}:${item.status}`;
     acc[key] = (acc[key] ?? 0) + 1;
     return acc;
-  }, {});
+  }, {} as Record<string, number>);
 
   const pipelineValue = deals.reduce((sum, item) => sum + Number(item.amount ?? 0), 0);
   const closeRate = dealCount > 0 ? Number((wonDeals / dealCount).toFixed(2)) : 0;
