@@ -194,24 +194,36 @@ export function DealerWorkspaceClient({
         return;
       }
 
-      const createdVehicleResponse = await fetch('/api/vehicles', {
+      const flowResponse = await fetch('/api/vehicles/auction-url/analyze', {
         method: 'POST',
         credentials: 'same-origin',
         headers: { 'Content-Type': 'application/json', [CSRF_HEADER]: csrfToken },
-        body: JSON.stringify({ listingUrl: auctionUrlInput.trim() })
+        body: JSON.stringify({ listingUrl: auctionUrlInput.trim(), mileage: 0 })
       });
 
-      const createdVehicleEnvelope: ApiEnvelope<{ id: string; vin: string | null; listingUrl?: string | null }> = await createdVehicleResponse.json();
-      if (!createdVehicleEnvelope.ok) {
-        setToast({ title: createdVehicleEnvelope.error.message, description: createdVehicleEnvelope.error.code });
+      const flowEnvelope: ApiEnvelope<{
+        analyzed: boolean;
+        reason?: 'VIN_NOT_FOUND';
+        usedExistingVehicle: boolean;
+        vehicle: { id: string; vin: string | null; listingUrl?: string | null };
+        report?: {
+          valuation: { value: { value: { marketValue: number } } };
+          damage: { value: { totalCost: number } };
+          auctionBid: { value: { projectedProfit: number; maxBid: number; recommendation?: 'Proceed' | 'Reconsider' | 'Pause' } };
+          recommendation: string;
+        };
+      }> = await flowResponse.json();
+
+      if (!flowEnvelope.ok) {
+        setToast({ title: flowEnvelope.error.message, description: flowEnvelope.error.code });
         setRetryTarget('mutation');
         return;
       }
 
-      const createdVehicle = createdVehicleEnvelope.data;
-      const vehicleLabel = getVehicleLabel(createdVehicle);
+      const flow = flowEnvelope.data;
+      const vehicleLabel = getVehicleLabel(flow.vehicle);
 
-      if (!createdVehicle.vin) {
+      if (!flow.analyzed || !flow.report) {
         setAuctionFlowResult({
           vehicleLabel,
           marketValue: null,
@@ -220,48 +232,24 @@ export function DealerWorkspaceClient({
           maximumBid: null,
           buyOrPass: 'PASS'
         });
-        setToast({ title: 'Vehicle created', description: 'VIN not found in URL, so valuation metrics are pending.' });
-        router.refresh();
-        return;
+        setToast({ title: 'Vehicle created', description: 'VIN could not be resolved from this URL, so automated analysis is pending.' });
+      } else {
+        const bidRecommendation = flow.report.auctionBid.value.recommendation;
+        const buyOrPass = bidRecommendation === 'Proceed' ? 'BUY' : bidRecommendation === 'Reconsider' || bidRecommendation === 'Pause' ? 'PASS' : flow.report.recommendation === 'PASS' ? 'PASS' : 'BUY';
+        setAuctionFlowResult({
+          vehicleLabel,
+          marketValue: flow.report.valuation.value.value.marketValue,
+          repairEstimate: flow.report.damage.value.totalCost,
+          projectedProfit: flow.report.auctionBid.value.projectedProfit,
+          maximumBid: flow.report.auctionBid.value.maxBid,
+          buyOrPass
+        });
+        setToast({
+          title: 'DealerOS completed analysis',
+          description: flow.usedExistingVehicle ? `Analyzed existing vehicle ${vehicleLabel}.` : `Vehicle ${vehicleLabel} created and analyzed.`
+        });
       }
 
-      const analysisResponse = await fetch('/api/vin-analyses/analyze', {
-        method: 'POST',
-        credentials: 'same-origin',
-        headers: { 'Content-Type': 'application/json', [CSRF_HEADER]: csrfToken },
-        body: JSON.stringify({
-          vehicleId: createdVehicle.id,
-          vin: createdVehicle.vin,
-          mileage: 0
-        })
-      });
-
-      const analysisEnvelope: ApiEnvelope<{
-        valuation: { value: { value: { marketValue: number } } };
-        damage: { value: { totalCost: number } };
-        auctionBid: { value: { projectedProfit: number; maxBid: number; recommendation?: 'Proceed' | 'Reconsider' | 'Pause' } };
-        recommendation: string;
-      }> = await analysisResponse.json();
-
-      if (!analysisEnvelope.ok) {
-        setToast({ title: analysisEnvelope.error.message, description: analysisEnvelope.error.code });
-        setRetryTarget('mutation');
-        router.refresh();
-        return;
-      }
-
-      const analysis = analysisEnvelope.data;
-      const bidRecommendation = analysis.auctionBid.value.recommendation;
-      const buyOrPass = bidRecommendation === 'Proceed' ? 'BUY' : bidRecommendation === 'Reconsider' || bidRecommendation === 'Pause' ? 'PASS' : analysis.recommendation === 'PASS' ? 'PASS' : 'BUY';
-      setAuctionFlowResult({
-        vehicleLabel,
-        marketValue: analysis.valuation.value.value.marketValue,
-        repairEstimate: analysis.damage.value.totalCost,
-        projectedProfit: analysis.auctionBid.value.projectedProfit,
-        maximumBid: analysis.auctionBid.value.maxBid,
-        buyOrPass
-      });
-      setToast({ title: 'DealerOS completed analysis', description: `Vehicle ${vehicleLabel} created and analyzed.` });
       router.refresh();
     } catch (error) {
       setToast({ title: 'Request failed', description: error instanceof Error ? error.message : 'Unknown error' });
