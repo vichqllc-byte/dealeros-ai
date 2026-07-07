@@ -1,14 +1,29 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+
+const CSRF_COOKIE = 'csrf_token';
+const CSRF_HEADER = 'x-csrf-token';
+
+function readCookie(name: string): string | null {
+  const match = document.cookie
+    .split(';')
+    .map((part) => part.trim())
+    .find((part) => part.startsWith(`${name}=`));
+
+  if (!match) return null;
+  const value = match.slice(name.length + 1);
+  return decodeURIComponent(value);
+}
 
 export function AuthGateway() {
   const [mode, setMode] = useState<'login' | 'register'>('login');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [csrfToken, setCsrfToken] = useState<string | null>(null);
 
   const [login, setLogin] = useState({ email: '', password: '' });
   const [register, setRegister] = useState({
@@ -19,13 +34,43 @@ export function AuthGateway() {
     organizationName: ''
   });
 
+  async function initCsrfToken(): Promise<string | null> {
+    try {
+      await fetch('/api/auth/csrf', {
+        method: 'GET',
+        credentials: 'same-origin',
+        cache: 'no-store'
+      });
+    } catch {
+      // Surface a friendly auth error on submit instead of throwing here.
+    }
+
+    const tokenFromCookie = readCookie(CSRF_COOKIE);
+    setCsrfToken(tokenFromCookie);
+    return tokenFromCookie;
+  }
+
+  useEffect(() => {
+    void initCsrfToken();
+  }, []);
+
   async function submitLogin() {
     setLoading(true);
     setError(null);
     try {
+      const token = csrfToken ?? (await initCsrfToken());
+      if (!token) {
+        setError('Could not initialize secure session token. Refresh and try again.');
+        return;
+      }
+
       const res = await fetch('/api/auth/login', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        credentials: 'same-origin',
+        headers: {
+          'Content-Type': 'application/json',
+          [CSRF_HEADER]: token
+        },
         body: JSON.stringify(login)
       });
       const body = await res.json();
@@ -45,9 +90,19 @@ export function AuthGateway() {
     setLoading(true);
     setError(null);
     try {
+      const token = csrfToken ?? (await initCsrfToken());
+      if (!token) {
+        setError('Could not initialize secure session token. Refresh and try again.');
+        return;
+      }
+
       const res = await fetch('/api/auth/register', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        credentials: 'same-origin',
+        headers: {
+          'Content-Type': 'application/json',
+          [CSRF_HEADER]: token
+        },
         body: JSON.stringify(register)
       });
       const body = await res.json();
@@ -87,12 +142,14 @@ export function AuthGateway() {
 
           {mode === 'login' ? (
             <div className="grid gap-3">
+              <input type="hidden" name="csrfToken" value={csrfToken ?? ''} readOnly />
               <Input placeholder="Email" type="email" value={login.email} onChange={(e) => setLogin({ ...login, email: e.target.value })} />
               <Input placeholder="Password" type="password" value={login.password} onChange={(e) => setLogin({ ...login, password: e.target.value })} />
               <Button disabled={loading} onClick={submitLogin}>{loading ? 'Signing in...' : 'Sign in'}</Button>
             </div>
           ) : (
             <div className="grid gap-3">
+              <input type="hidden" name="csrfToken" value={csrfToken ?? ''} readOnly />
               <Input placeholder="First name" value={register.firstName} onChange={(e) => setRegister({ ...register, firstName: e.target.value })} />
               <Input placeholder="Last name" value={register.lastName} onChange={(e) => setRegister({ ...register, lastName: e.target.value })} />
               <Input placeholder="Organization" value={register.organizationName} onChange={(e) => setRegister({ ...register, organizationName: e.target.value })} />

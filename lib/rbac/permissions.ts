@@ -2,10 +2,10 @@ import type { AppRole } from '@/lib/auth/session';
 
 export const rolePermissions: Record<AppRole, string[]> = {
   DEALER_OWNER: [
-    'vehicles.read', 'vehicles.write', 'vin.write', 'audit.read', 'crm.read', 'crm.write', 'sales.read', 'sales.write',
+    'vehicles.read', 'vehicles.write', 'vin.write', 'audit.read', 'crm.read', 'crm.write', 'deals.read', 'deals.write', 'sales.read', 'sales.write',
     'billing.read', 'billing.write', 'team.read', 'team.write'
   ],
-  DEALER_BUYER: ['vehicles.read', 'vehicles.write', 'vin.write', 'crm.read', 'crm.write', 'team.read'],
+  DEALER_BUYER: ['vehicles.read', 'vehicles.write', 'vin.write', 'crm.read', 'crm.write', 'deals.read', 'deals.write', 'team.read'],
   VENDOR_MANAGER: ['quotes.read', 'quotes.write'],
   ADMIN: ['*']
 };

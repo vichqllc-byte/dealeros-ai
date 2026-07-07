@@ -1,6 +1,16 @@
 -- AlterTable
-ALTER TABLE "User" ADD COLUMN     "emailVerifiedAt" TIMESTAMP(3),
-ADD COLUMN     "passwordHash" TEXT NOT NULL;
+ALTER TABLE "User"
+ADD COLUMN     "emailVerifiedAt" TIMESTAMP(3),
+ADD COLUMN     "passwordHash" TEXT;
+
+-- Backfill legacy users created before local password auth existed so
+-- the NOT NULL constraint can be applied deterministically.
+UPDATE "User"
+SET "passwordHash" = '$argon2id$v=19$m=19456,t=2,p=1$MDAwMDAwMDAwMDAwMDAwMA$6Jce4nD5T56IN7fQGn7xDk0f7bQ90E+fNwB8b0oEkRA'
+WHERE "passwordHash" IS NULL;
+
+ALTER TABLE "User"
+ALTER COLUMN "passwordHash" SET NOT NULL;
 
 -- CreateTable
 CREATE TABLE "Session" (
