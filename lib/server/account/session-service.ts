@@ -3,7 +3,7 @@ import { AppError } from '@/lib/api/responses';
 
 export async function listSessionsForUser(userId: string, currentSessionId: string) {
   const sessions = await db.session.findMany({ where: { userId, revokedAt: null }, orderBy: { lastUsedAt: 'desc' } });
-  return sessions.map((session) => ({
+  return sessions.map((session: (typeof sessions)[number]) => ({
     id: session.id,
     userAgent: session.userAgent,
     ipAddress: session.ipAddress,
