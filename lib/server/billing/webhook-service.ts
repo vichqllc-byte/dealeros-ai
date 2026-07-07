@@ -3,11 +3,13 @@ import { db } from '@/lib/db/client';
 import { getEnvVar } from '@/lib/vin-intelligence/providers/provider-config';
 import { getDefaultStripeGateway, type StripeGateway } from '@/lib/billing/stripe-gateway';
 import { createLogger } from '@/lib/logging/logger';
-import type { $Enums } from '@prisma/client';
+
+type SubscriptionStatus = 'TRIALING' | 'ACTIVE' | 'PAST_DUE' | 'CANCELED' | 'UNPAID' | 'INCOMPLETE';
+type InvoiceStatus = 'DRAFT' | 'OPEN' | 'PAID' | 'VOID' | 'UNCOLLECTIBLE';
 
 const logger = createLogger('stripe-webhook-service');
 
-function subscriptionStatusFromStripe(status: Stripe.Subscription.Status): $Enums.SubscriptionStatus {
+function subscriptionStatusFromStripe(status: Stripe.Subscription.Status): SubscriptionStatus {
   switch (status) {
     case 'trialing':
       return 'TRIALING';
@@ -26,7 +28,7 @@ function subscriptionStatusFromStripe(status: Stripe.Subscription.Status): $Enum
   }
 }
 
-function invoiceStatusFromStripe(status: Stripe.Invoice.Status | null): $Enums.InvoiceStatus {
+function invoiceStatusFromStripe(status: Stripe.Invoice.Status | null): InvoiceStatus {
   switch (status) {
     case 'draft':
       return 'DRAFT';
