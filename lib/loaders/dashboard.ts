@@ -2,9 +2,12 @@ import { db } from '@/lib/db/client';
 import { listOpportunitySummariesForOrg } from '@/lib/server/opportunity-service';
 
 export async function loadDealerDashboard(organizationId: string) {
-  const [vehicleCount, analyzedCount, recentVehicles, analyses, activity, opportunities] = await Promise.all([
+  const [vehicleCount, analyzedCount, customerCount, dealCount, listingCount, recentVehicles, analyses, activity, opportunities, notifications] = await Promise.all([
     db.vehicle.count({ where: { organizationId } }),
     db.vehicle.count({ where: { organizationId, status: 'ANALYZED' } }),
+    db.customer.count({ where: { organizationId } }),
+    db.deal.count({ where: { organizationId } }),
+    db.listingPost.count({ where: { organizationId, status: 'POSTED' } }),
     db.vehicle.findMany({
       where: { organizationId },
       orderBy: { createdAt: 'desc' },
@@ -22,10 +25,11 @@ export async function loadDealerDashboard(organizationId: string) {
       orderBy: { createdAt: 'desc' },
       take: 10
     }),
-    listOpportunitySummariesForOrg(organizationId)
+    listOpportunitySummariesForOrg(organizationId),
+    db.notification.findMany({ where: { organizationId }, orderBy: { createdAt: 'desc' }, take: 8 })
   ]);
 
-  return { vehicleCount, analyzedCount, recentVehicles, analyses, activity, opportunities };
+  return { vehicleCount, analyzedCount, customerCount, dealCount, listingCount, recentVehicles, analyses, activity, opportunities, notifications };
 }
 
 export async function loadVendorDashboard(organizationId: string) {

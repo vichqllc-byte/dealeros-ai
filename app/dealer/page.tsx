@@ -104,7 +104,7 @@ export default async function DealerPage() {
     return (
       <DashboardShell title="Dealer Workspace" subtitle="Acquisition pipeline, VIN analysis, sourcing, and profit view.">
         <div className="grid gap-6">
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
             <Card>
               <div className="text-sm text-neutral-500">Vehicles</div>
               <div className="mt-2 text-3xl font-bold">{data.vehicleCount}</div>
@@ -117,6 +117,18 @@ export default async function DealerPage() {
                 </div>
                 <Badge>Live DB</Badge>
               </div>
+            </Card>
+            <Card>
+              <div className="text-sm text-neutral-500">Customers</div>
+              <div className="mt-2 text-3xl font-bold">{data.customerCount}</div>
+            </Card>
+            <Card>
+              <div className="text-sm text-neutral-500">Deals</div>
+              <div className="mt-2 text-3xl font-bold">{data.dealCount}</div>
+            </Card>
+            <Card>
+              <div className="text-sm text-neutral-500">Marketplace posts</div>
+              <div className="mt-2 text-3xl font-bold">{data.listingCount}</div>
             </Card>
           </div>
 
@@ -171,6 +183,20 @@ export default async function DealerPage() {
                 {data.activity.map((item) => (
                   <li key={item.id} className="rounded-lg border border-border p-2">
                     {item.summary} <span className="text-neutral-500">({item.type})</span>
+                  </li>
+                ))}
+              </ul>
+            </Card>
+            <Card>
+              <div className="text-sm font-semibold text-neutral-700">Notifications</div>
+              <ul className="mt-3 space-y-2 text-sm text-neutral-700">
+                {data.notifications.length === 0 ? (
+                  <li className="rounded-lg border border-border p-2 text-neutral-500">No notifications yet.</li>
+                ) : data.notifications.map((item) => (
+                  <li key={item.id} className="rounded-lg border border-border p-2">
+                    <div className="font-medium">{item.title}</div>
+                    <div className="text-neutral-600">{item.message}</div>
+                    <div className="text-xs uppercase tracking-[0.15em] text-neutral-500">{item.status}</div>
                   </li>
                 ))}
               </ul>

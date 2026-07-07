@@ -1,5 +1,1 @@
--- AlterTable
-ALTER TABLE "Vehicle" ADD COLUMN "workflowState" TEXT;
-
--- AlterTable
-ALTER TABLE "VinAnalysis" ADD COLUMN "workflowState" TEXT;
+-- No-op migration: workflowState columns are now created in 0001_init.

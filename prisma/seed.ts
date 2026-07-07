@@ -71,6 +71,66 @@ async function main() {
       }
     });
   }
+
+  const customer = await prisma.customer.upsert({
+    where: { id: 'seed-customer-1' },
+    update: {},
+    create: {
+      id: 'seed-customer-1',
+      organizationId: org.id,
+      firstName: 'Alex',
+      lastName: 'Buyer',
+      email: 'alex.buyer@dealeros.ai',
+      phone: '555-0109',
+      notes: 'Interested in late model trucks.',
+      status: 'ACTIVE'
+    }
+  });
+
+  await prisma.deal.upsert({
+    where: { id: 'seed-deal-1' },
+    update: {},
+    create: {
+      id: 'seed-deal-1',
+      organizationId: org.id,
+      customerId: customer.id,
+      vehicleId: vehicle.id,
+      stage: 'NEGOTIATING',
+      amount: 33950,
+      notes: 'Customer requested tow package and financing options.'
+    }
+  });
+
+  await prisma.listingPost.upsert({
+    where: { id: 'seed-listing-1' },
+    update: {},
+    create: {
+      id: 'seed-listing-1',
+      organizationId: org.id,
+      vehicleId: vehicle.id,
+      channel: 'FACEBOOK_MARKETPLACE',
+      status: 'POSTED',
+      title: '2022 Ford F-150 Lariat',
+      description: 'One-owner truck with clean history and strong margin profile.',
+      price: 36995,
+      externalId: 'fb-seed-1001',
+      postedAt: new Date()
+    }
+  });
+
+  await prisma.notification.upsert({
+    where: { id: 'seed-notification-1' },
+    update: {},
+    create: {
+      id: 'seed-notification-1',
+      organizationId: org.id,
+      actorUserId: user.id,
+      channel: 'IN_APP',
+      status: 'PENDING',
+      title: 'Deal pipeline follow-up',
+      message: 'Contact customer Alex Buyer about financing pre-approval today.'
+    }
+  });
 }
 
 main().finally(async () => prisma.$disconnect());

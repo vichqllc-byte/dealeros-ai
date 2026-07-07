@@ -1,5 +1,3 @@
-import Link from 'next/link';
-
 export function DashboardShell({
   title,
   subtitle,
@@ -19,9 +17,9 @@ export function DashboardShell({
             <p className="mt-1 text-sm text-neutral-600">{subtitle}</p>
           </div>
           <nav className="grid gap-2 text-sm">
-            <Link href="/dealer">Dealer</Link>
-            <Link href="/vendor">Vendor</Link>
-            <Link href="/admin">Admin</Link>
+            <a href="/dealer">Dealer</a>
+            <a href="/vendor">Vendor</a>
+            <a href="/admin">Admin</a>
           </nav>
         </aside>
         <main className="p-8">{children}</main>

@@ -1,18 +1,55 @@
-import Link from 'next/link';
+import { AuthGateway } from '@/components/auth/auth-gateway';
+import { DealerHomeDashboard } from '@/components/home/dealer-home-dashboard';
+import { getSession } from '@/lib/auth/session';
+import { db } from '@/lib/db/client';
+import { getAnalyticsForOrg } from '@/lib/server/analytics-service';
+import { hasPermission } from '@/lib/rbac/permissions';
 
-export default function HomePage() {
+export default async function HomePage() {
+  const session = await getSession();
+  if (!session) return <AuthGateway />;
+
+  const [
+    vehicles,
+    customers,
+    deals,
+    notifications,
+    analytics,
+    memberships
+  ] = await Promise.all([
+    db.vehicle.findMany({ where: { organizationId: session.organizationId }, orderBy: { createdAt: 'desc' }, take: 30 }),
+    db.customer.findMany({ where: { organizationId: session.organizationId }, orderBy: { createdAt: 'desc' }, take: 30 }),
+    db.deal.findMany({
+      where: { organizationId: session.organizationId },
+      include: { customer: true, vehicle: true },
+      orderBy: { updatedAt: 'desc' },
+      take: 30
+    }),
+    db.notification.findMany({ where: { organizationId: session.organizationId }, orderBy: { createdAt: 'desc' }, take: 20 }),
+    getAnalyticsForOrg(session.organizationId),
+    hasPermission(session.role, 'roles.manage')
+      ? db.membership.findMany({ where: { organizationId: session.organizationId }, include: { user: true }, orderBy: { createdAt: 'asc' } })
+      : Promise.resolve([])
+  ]);
+
   return (
-    <main className="mx-auto flex min-h-screen max-w-5xl flex-col justify-center gap-6 px-6">
-      <p className="text-sm font-semibold uppercase tracking-[0.2em] text-primary">DealersOS Phase 1</p>
-      <h1 className="text-4xl font-bold">Production scaffold initialized.</h1>
-      <p className="max-w-2xl text-lg text-neutral-700">
-        This foundation replaces the static prototype with a real application structure for dealer, vendor, and admin workspaces.
-      </p>
-      <div className="flex gap-4">
-        <Link className="rounded-lg bg-primary px-4 py-3 text-white" href="/dealer">Dealer app</Link>
-        <Link className="rounded-lg border border-border px-4 py-3" href="/vendor">Vendor app</Link>
-        <Link className="rounded-lg border border-border px-4 py-3" href="/admin">Admin app</Link>
-      </div>
-    </main>
+    <DealerHomeDashboard
+      user={{ email: session.email, role: session.role }}
+      stats={{
+        vehicles: vehicles.length,
+        analyzed: vehicles.filter((v) => v.status === 'ANALYZED').length,
+        customers: customers.length,
+        deals: deals.length,
+        listings: analytics.channelBreakdown ? Object.values(analytics.channelBreakdown).reduce((sum, count) => sum + count, 0) : 0,
+        notifications: notifications.length
+      }}
+      vehicles={vehicles.map((v) => ({ id: v.id, vin: v.vin, make: v.make, model: v.model, year: v.year, status: v.status }))}
+      customers={customers.map((c) => ({ id: c.id, firstName: c.firstName, lastName: c.lastName, email: c.email, status: c.status }))}
+      deals={deals.map((d) => ({ id: d.id, stage: d.stage, amount: d.amount ? Number(d.amount) : null, customerName: `${d.customer.firstName} ${d.customer.lastName}`, vehicleVin: d.vehicle?.vin ?? null }))}
+      notifications={notifications.map((n) => ({ id: n.id, title: n.title, message: n.message, status: n.status }))}
+      analytics={analytics}
+      canManageRoles={hasPermission(session.role, 'roles.manage')}
+      roleOptions={memberships.map((m) => ({ id: m.id, label: `${m.user.firstName} ${m.user.lastName} (${m.user.email})`, role: m.role }))}
+    />
   );
 }

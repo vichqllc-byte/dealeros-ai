@@ -13,6 +13,8 @@ export default async function AdminPage() {
         <Card><div className="text-sm text-neutral-500">Organization</div><div className="mt-2 text-xl font-bold">{data.organizationName}</div></Card>
         <Card><div className="text-sm text-neutral-500">Users</div><div className="mt-2 text-3xl font-bold">{data.userCount}</div></Card>
         <Card><div className="text-sm text-neutral-500">Vehicles</div><div className="mt-2 text-3xl font-bold">{data.vehicleCount}</div></Card>
+        <Card><div className="text-sm text-neutral-500">Customers</div><div className="mt-2 text-3xl font-bold">{data.customerCount}</div></Card>
+        <Card><div className="text-sm text-neutral-500">Deals</div><div className="mt-2 text-3xl font-bold">{data.dealCount}</div></Card>
         <Card><div className="text-sm text-neutral-500">Audit entries</div><div className="mt-2 text-3xl font-bold">{data.auditCount}</div></Card>
       </div>
       <div className="mt-6 grid gap-4 lg:grid-cols-2">

@@ -3,10 +3,32 @@ import { createVehicleForOrg, listVehiclesForOrg } from '@/lib/server/vehicle-se
 import { handleRouteError, ok } from '@/lib/api/responses';
 import { requireCsrfToken } from '@/lib/security/guards';
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
     const auth = await requireRoutePermission('vehicles.read');
-    const data = await listVehiclesForOrg(auth.session.organizationId);
+    const url = new URL(request.url);
+    const status = url.searchParams.get('status');
+    const query = url.searchParams.get('q');
+
+    const data = status || query
+      ? await db.vehicle.findMany({
+          where: {
+            organizationId: auth.session.organizationId,
+            ...(status ? { status: status as any } : {}),
+            ...(query
+              ? {
+                  OR: [
+                    { vin: { contains: query, mode: 'insensitive' } },
+                    { make: { contains: query, mode: 'insensitive' } },
+                    { model: { contains: query, mode: 'insensitive' } }
+                  ]
+                }
+              : {})
+          },
+          orderBy: { createdAt: 'desc' },
+          include: { vinAnalyses: { orderBy: { createdAt: 'desc' }, take: 1 } }
+        })
+      : await listVehiclesForOrg(auth.session.organizationId);
     return ok(data);
   } catch (error) {
     return handleRouteError(error);

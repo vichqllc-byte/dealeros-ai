@@ -252,6 +252,104 @@ model Vehicle {
   @@index([organizationId, status])
 }
 
+model Customer {
+  id              String         @id @default(cuid())
+  organizationId  String
+  firstName       String
+  lastName        String
+  email           String?
+  phone           String?
+  notes           String?
+  status          CustomerStatus @default(LEAD)
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+  organization    Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  deals           Deal[]
+
+  @@index([organizationId, status])
+}
+
+model Deal {
+  id              String      @id @default(cuid())
+  organizationId  String
+  customerId      String
+  vehicleId       String?
+  stage           DealStage   @default(NEW)
+  amount          Decimal?    @db.Decimal(12, 2)
+  expectedCloseAt DateTime?
+  closedAt        DateTime?
+  notes           String?
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  customer        Customer    @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  vehicle         Vehicle?    @relation(fields: [vehicleId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, stage])
+  @@index([customerId])
+}
+
+model ListingPost {
+  id              String        @id @default(cuid())
+  organizationId  String
+  vehicleId       String
+  channel         ListingChannel
+  status          ListingStatus @default(DRAFT)
+  externalId      String?
+  title           String
+  description     String
+  price           Decimal?      @db.Decimal(12, 2)
+  errorMessage    String?
+  postedAt        DateTime?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  organization    Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  vehicle         Vehicle       @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, channel, status])
+  @@index([vehicleId])
+}
+
+model AuctionListing {
+  id              String        @id @default(cuid())
+  organizationId  String
+  source          AuctionSource
+  lotNumber       String
+  vin             String
+  year            Int?
+  make            String?
+  model           String?
+  title           String?
+  currentBid      Decimal?      @db.Decimal(12, 2)
+  buyNowPrice     Decimal?      @db.Decimal(12, 2)
+  saleDate        DateTime?
+  rawPayload      Json?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  organization    Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([source, lotNumber])
+  @@index([organizationId, source, createdAt])
+}
+
+model Notification {
+  id              String              @id @default(cuid())
+  organizationId  String
+  actorUserId     String?
+  channel         NotificationChannel @default(IN_APP)
+  status          NotificationStatus  @default(PENDING)
+  title           String
+  message         String
+  metadata        Json?
+  readAt          DateTime?
+  sentAt          DateTime?
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+  organization    Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, status, createdAt])
+}
+
 model VinAnalysis {
   id                String             @id @default(cuid())
   vehicleId         String

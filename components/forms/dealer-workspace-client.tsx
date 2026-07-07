@@ -51,10 +51,24 @@ export function DealerWorkspaceClient({
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState<string | null>(null);
   const [retryTarget, setRetryTarget] = useState<string | null>(null);
+  const [vehicleQuery, setVehicleQuery] = useState('');
+  const [analysisQuery, setAnalysisQuery] = useState('');
   const controlsDisabled = saving || !!deleting;
 
-  const vehicleRows = useMemo(() => vehicles.map((vehicle) => [vehicle.vin, [vehicle.year, vehicle.make, vehicle.model].filter(Boolean).join(' '), vehicle.status, vehicle.workflowState ?? '—', vehicle.vinAnalyses[0]?.recommendation ?? '—']), [vehicles]);
-  const analysisRows = useMemo(() => analyses.map((analysis) => [analysis.vehicle.vin, analysis.recommendation ?? '—', analysis.workflowState ?? '—', analysis.projectedRoi ?? '—']), [analyses]);
+  const filteredVehicles = useMemo(() => {
+    const query = vehicleQuery.trim().toLowerCase();
+    if (!query) return vehicles;
+    return vehicles.filter((vehicle) => `${vehicle.vin} ${vehicle.year ?? ''} ${vehicle.make ?? ''} ${vehicle.model ?? ''} ${vehicle.status} ${vehicle.workflowState ?? ''}`.toLowerCase().includes(query));
+  }, [vehicleQuery, vehicles]);
+
+  const filteredAnalyses = useMemo(() => {
+    const query = analysisQuery.trim().toLowerCase();
+    if (!query) return analyses;
+    return analyses.filter((analysis) => `${analysis.vehicle.vin} ${analysis.recommendation ?? ''} ${analysis.workflowState ?? ''} ${analysis.projectedRoi ?? ''}`.toLowerCase().includes(query));
+  }, [analysisQuery, analyses]);
+
+  const vehicleRows = useMemo(() => filteredVehicles.map((vehicle) => [vehicle.vin, [vehicle.year, vehicle.make, vehicle.model].filter(Boolean).join(' '), vehicle.status, vehicle.workflowState ?? '—', vehicle.vinAnalyses[0]?.recommendation ?? '—']), [filteredVehicles]);
+  const analysisRows = useMemo(() => filteredAnalyses.map((analysis) => [analysis.vehicle.vin, analysis.recommendation ?? '—', analysis.workflowState ?? '—', analysis.projectedRoi ?? '—']), [filteredAnalyses]);
 
   async function handleSubmit(url: string, method: string, payload: unknown, successMessage: string) {
     setSaving(true);
@@ -122,6 +136,7 @@ export function DealerWorkspaceClient({
       <div className="grid gap-6 lg:grid-cols-2">
         <Card>
           <h3 className="text-lg font-semibold">{editingVehicleId ? 'Edit vehicle' : 'Create vehicle'}</h3>
+          {editingVehicleId ? <p className="mt-2 text-xs text-neutral-500">Editing an existing vehicle. Use clear to switch back to create mode.</p> : null}
           <div className="mt-4 grid gap-3">
             <Input disabled={controlsDisabled} placeholder="VIN" value={vehicleForm.vin} onChange={(e) => setVehicleForm({ ...vehicleForm, vin: e.target.value })} />
             {errors.vin ? <p className="text-sm text-red-600">{errors.vin}</p> : null}
@@ -132,11 +147,13 @@ export function DealerWorkspaceClient({
             <Button disabled={controlsDisabled} onClick={() => handleSubmit(editingVehicleId ? `/api/vehicles/${editingVehicleId}` : '/api/vehicles', editingVehicleId ? 'PATCH' : 'POST', { vin: vehicleForm.vin, year: vehicleForm.year ? Number(vehicleForm.year) : undefined, make: vehicleForm.make || undefined, model: vehicleForm.model || undefined, workflowState: vehicleForm.workflowState || undefined }, editingVehicleId ? 'Vehicle updated' : 'Vehicle created')}>
               {saving ? 'Saving…' : editingVehicleId ? 'Update vehicle' : 'Create vehicle'}
             </Button>
+            {editingVehicleId ? <Button className="bg-white text-foreground border border-border" disabled={controlsDisabled} onClick={() => { setEditingVehicleId(null); setVehicleForm({ vin: '', year: '', make: '', model: '', workflowState: '' }); }}>Clear edit</Button> : null}
           </div>
         </Card>
 
         <Card>
           <h3 className="text-lg font-semibold">{editingAnalysisId ? 'Edit VIN analysis' : 'Create VIN analysis'}</h3>
+          {editingAnalysisId ? <p className="mt-2 text-xs text-neutral-500">Editing an existing analysis. Use clear to switch back to create mode.</p> : null}
           <div className="mt-4 grid gap-3">
             <Input disabled={controlsDisabled} placeholder="Vehicle ID" value={vinForm.vehicleId} onChange={(e) => setVinForm({ ...vinForm, vehicleId: e.target.value })} />
             {errors.vehicleId ? <p className="text-sm text-red-600">{errors.vehicleId}</p> : null}
@@ -148,17 +165,22 @@ export function DealerWorkspaceClient({
             <Button disabled={controlsDisabled} onClick={() => handleSubmit(editingAnalysisId ? `/api/vin-analyses/${editingAnalysisId}` : '/api/vin-analyses', editingAnalysisId ? 'PATCH' : 'POST', { vehicleId: vinForm.vehicleId, decodedPayload: { source: 'manual-form' }, marketValue: vinForm.marketValue ? Number(vinForm.marketValue) : undefined, wholesaleValue: vinForm.wholesaleValue ? Number(vinForm.wholesaleValue) : undefined, projectedRoi: vinForm.projectedRoi ? Number(vinForm.projectedRoi) : undefined, confidenceScore: vinForm.confidenceScore ? Number(vinForm.confidenceScore) : undefined, recommendation: vinForm.recommendation, workflowState: vinForm.workflowState || undefined }, editingAnalysisId ? 'VIN analysis updated' : 'VIN analysis created')}>
               {saving ? 'Saving…' : editingAnalysisId ? 'Update VIN analysis' : 'Create VIN analysis'}
             </Button>
+            {editingAnalysisId ? <Button className="bg-white text-foreground border border-border" disabled={controlsDisabled} onClick={() => { setEditingAnalysisId(null); setVinForm({ vehicleId: '', marketValue: '', wholesaleValue: '', projectedRoi: '', confidenceScore: '', recommendation: 'NEGOTIATE', workflowState: '' }); }}>Clear edit</Button> : null}
           </div>
         </Card>
       </div>
 
       <Card>
         <h3 className="text-lg font-semibold">Vehicles</h3>
+        <div className="mt-3 grid gap-2">
+          <Input disabled={controlsDisabled} placeholder="Filter vehicles by VIN, make, model, status, or workflow" value={vehicleQuery} onChange={(e) => setVehicleQuery(e.target.value)} />
+          <p className="text-xs text-neutral-500">Showing {filteredVehicles.length} of {vehicles.length} vehicles</p>
+        </div>
         {vehicles.length === 0 ? <p className="mt-3 text-sm text-neutral-600">No vehicles yet. Create your first acquisition record to begin.</p> : (
           <div className="mt-4 space-y-3">
             <Table headers={['VIN', 'Vehicle', 'Status', 'Workflow', 'Recommendation']} rows={vehicleRows} />
             <div className="flex flex-wrap gap-2">
-              {vehicles.map((vehicle) => (
+              {filteredVehicles.map((vehicle) => (
                 <div key={vehicle.id} className="flex gap-2">
                   <Button className="bg-white text-foreground border border-border" disabled={controlsDisabled} onClick={() => { setEditingVehicleId(vehicle.id); setVehicleForm({ vin: vehicle.vin, year: vehicle.year?.toString() || '', make: vehicle.make || '', model: vehicle.model || '', workflowState: vehicle.workflowState || '' }); }}>Edit {vehicle.vin}</Button>
                   <Button className="bg-red-600" disabled={controlsDisabled || deleting === `/api/vehicles/${vehicle.id}`} onClick={() => handleDelete(`/api/vehicles/${vehicle.id}`, 'Vehicle deleted')}>
@@ -174,11 +196,15 @@ export function DealerWorkspaceClient({
 
       <Card>
         <h3 className="text-lg font-semibold">VIN analyses</h3>
+        <div className="mt-3 grid gap-2">
+          <Input disabled={controlsDisabled} placeholder="Filter analyses by VIN, recommendation, workflow, or ROI" value={analysisQuery} onChange={(e) => setAnalysisQuery(e.target.value)} />
+          <p className="text-xs text-neutral-500">Showing {filteredAnalyses.length} of {analyses.length} analyses</p>
+        </div>
         {analyses.length === 0 ? <p className="mt-3 text-sm text-neutral-600">No VIN analyses yet. Analyze a vehicle to create the first recommendation.</p> : (
           <div className="mt-4 space-y-3">
             <Table headers={['Vehicle', 'Recommendation', 'Workflow', 'Projected ROI']} rows={analysisRows} />
             <div className="flex flex-wrap gap-2">
-              {analyses.map((analysis) => (
+              {filteredAnalyses.map((analysis) => (
                 <div key={analysis.id} className="flex gap-2">
                   <Button className="bg-white text-foreground border border-border" disabled={controlsDisabled} onClick={() => { setEditingAnalysisId(analysis.id); setVinForm({ vehicleId: analysis.vehicleId, marketValue: '', wholesaleValue: '', projectedRoi: analysis.projectedRoi?.toString() || '', confidenceScore: '', recommendation: analysis.recommendation || 'NEGOTIATE', workflowState: analysis.workflowState || '' }); }}>Edit analysis {analysis.vehicle.vin}</Button>
                   <Button className="bg-red-600" disabled={controlsDisabled || deleting === `/api/vin-analyses/${analysis.id}`} onClick={() => handleDelete(`/api/vin-analyses/${analysis.id}`, 'VIN analysis deleted')}>
