@@ -47,10 +47,12 @@ export async function loadVendorDashboard(organizationId: string) {
 }
 
 export async function loadAdminDashboard(organizationId: string) {
-  const [organization, userCount, vehicleCount, auditCount, recentActivity, recentAudit] = await Promise.all([
+  const [organization, userCount, vehicleCount, customerCount, dealCount, auditCount, recentActivity, recentAudit] = await Promise.all([
     db.organization.findUnique({ where: { id: organizationId } }),
     db.membership.count({ where: { organizationId } }),
     db.vehicle.count({ where: { organizationId } }),
+    db.customer.count({ where: { organizationId } }),
+    db.deal.count({ where: { organizationId } }),
     db.auditLog.count({ where: { organizationId } }),
     db.activityLog.findMany({ where: { organizationId }, orderBy: { createdAt: 'desc' }, take: 5 }),
     db.auditLog.findMany({ where: { organizationId }, orderBy: { createdAt: 'desc' }, take: 5 })
@@ -60,6 +62,8 @@ export async function loadAdminDashboard(organizationId: string) {
     organizationName: organization?.name ?? 'Unknown organization',
     userCount,
     vehicleCount,
+    customerCount,
+    dealCount,
     auditCount,
     recentActivity,
     recentAudit
