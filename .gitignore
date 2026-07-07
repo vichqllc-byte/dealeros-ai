@@ -1,24 +1,19 @@
-# dependencies
 node_modules/
-
-# next.js
 .next/
 out/
-next-env.d.ts
-
-# typescript
-*.tsbuildinfo
-
-# testing / build
+dist/
+build/
 coverage/
-playwright-report/
-test-results/
 
-# env
 .env
-.env.local
-.env.*.local
+.env.*
+!.env.example
 
-# misc
-.DS_Store
 *.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+*.tsbuildinfo
+.DS_Store
