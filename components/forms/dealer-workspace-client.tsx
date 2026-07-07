@@ -10,9 +10,14 @@ import { Table } from '@/components/ui/table';
 import { Toast } from '@/components/ui/toast';
 import type { ApiEnvelope } from '@/types/api';
 
+const CSRF_COOKIE = 'csrf_token';
+const CSRF_HEADER = 'x-csrf-token';
+
 type VehicleRow = {
   id: string;
-  vin: string;
+  vin: string | null;
+  listingUrl?: string | null;
+  auctionSource?: string | null;
   year: number | null;
   make: string | null;
   model: string | null;
@@ -27,8 +32,22 @@ type VinAnalysisRow = {
   recommendation: string | null;
   workflowState: string | null;
   projectedRoi: number | null;
-  vehicle: { vin: string };
+  vehicle: { vin: string | null; listingUrl?: string | null };
 };
+
+function readCookie(name: string): string | null {
+  const match = document.cookie
+    .split(';')
+    .map((part) => part.trim())
+    .find((part) => part.startsWith(`${name}=`));
+
+  if (!match) return null;
+  return decodeURIComponent(match.slice(name.length + 1));
+}
+
+function getVehicleLabel(vehicle: { vin?: string | null; listingUrl?: string | null }) {
+  return vehicle.vin ?? vehicle.listingUrl ?? 'Pending auction vehicle';
+}
 
 export function DealerWorkspaceClient({
   vehicles,
@@ -42,7 +61,7 @@ export function DealerWorkspaceClient({
   loaderError?: boolean;
 }) {
   const router = useRouter();
-  const [vehicleForm, setVehicleForm] = useState({ vin: '', year: '', make: '', model: '', workflowState: '' });
+  const [vehicleForm, setVehicleForm] = useState({ listingUrl: '', vin: '', year: '', make: '', model: '', workflowState: '' });
   const [vinForm, setVinForm] = useState({ vehicleId: '', marketValue: '', wholesaleValue: '', projectedRoi: '', confidenceScore: '', recommendation: 'NEGOTIATE', workflowState: '' });
   const [editingVehicleId, setEditingVehicleId] = useState<string | null>(null);
   const [editingAnalysisId, setEditingAnalysisId] = useState<string | null>(null);
@@ -53,31 +72,63 @@ export function DealerWorkspaceClient({
   const [retryTarget, setRetryTarget] = useState<string | null>(null);
   const [vehicleQuery, setVehicleQuery] = useState('');
   const [analysisQuery, setAnalysisQuery] = useState('');
+  const [auctionUrlInput, setAuctionUrlInput] = useState('');
+  const [auctionFlowResult, setAuctionFlowResult] = useState<{
+    vehicleLabel: string;
+    marketValue: number | null;
+    repairEstimate: number | null;
+    projectedProfit: number | null;
+    maximumBid: number | null;
+    buyOrPass: 'BUY' | 'PASS';
+  } | null>(null);
+  const [runningAuctionFlow, setRunningAuctionFlow] = useState(false);
   const controlsDisabled = saving || !!deleting;
 
   const filteredVehicles = useMemo(() => {
     const query = vehicleQuery.trim().toLowerCase();
     if (!query) return vehicles;
-    return vehicles.filter((vehicle) => `${vehicle.vin} ${vehicle.year ?? ''} ${vehicle.make ?? ''} ${vehicle.model ?? ''} ${vehicle.status} ${vehicle.workflowState ?? ''}`.toLowerCase().includes(query));
+    return vehicles.filter((vehicle) => `${vehicle.vin ?? ''} ${vehicle.listingUrl ?? ''} ${vehicle.auctionSource ?? ''} ${vehicle.year ?? ''} ${vehicle.make ?? ''} ${vehicle.model ?? ''} ${vehicle.status} ${vehicle.workflowState ?? ''}`.toLowerCase().includes(query));
   }, [vehicleQuery, vehicles]);
 
   const filteredAnalyses = useMemo(() => {
     const query = analysisQuery.trim().toLowerCase();
     if (!query) return analyses;
-    return analyses.filter((analysis) => `${analysis.vehicle.vin} ${analysis.recommendation ?? ''} ${analysis.workflowState ?? ''} ${analysis.projectedRoi ?? ''}`.toLowerCase().includes(query));
+    return analyses.filter((analysis) => `${analysis.vehicle.vin ?? ''} ${analysis.vehicle.listingUrl ?? ''} ${analysis.recommendation ?? ''} ${analysis.workflowState ?? ''} ${analysis.projectedRoi ?? ''}`.toLowerCase().includes(query));
   }, [analysisQuery, analyses]);
 
-  const vehicleRows = useMemo(() => filteredVehicles.map((vehicle) => [vehicle.vin, [vehicle.year, vehicle.make, vehicle.model].filter(Boolean).join(' '), vehicle.status, vehicle.workflowState ?? '—', vehicle.vinAnalyses[0]?.recommendation ?? '—']), [filteredVehicles]);
-  const analysisRows = useMemo(() => filteredAnalyses.map((analysis) => [analysis.vehicle.vin, analysis.recommendation ?? '—', analysis.workflowState ?? '—', analysis.projectedRoi ?? '—']), [filteredAnalyses]);
+  const vehicleRows = useMemo(() => filteredVehicles.map((vehicle) => [getVehicleLabel(vehicle), [vehicle.year, vehicle.make, vehicle.model].filter(Boolean).join(' '), vehicle.status, vehicle.workflowState ?? '—', vehicle.vinAnalyses[0]?.recommendation ?? '—']), [filteredVehicles]);
+  const analysisRows = useMemo(() => filteredAnalyses.map((analysis) => [getVehicleLabel(analysis.vehicle), analysis.recommendation ?? '—', analysis.workflowState ?? '—', analysis.projectedRoi ?? '—']), [filteredAnalyses]);
+
+  async function initCsrfToken() {
+    try {
+      await fetch('/api/auth/csrf', {
+        method: 'GET',
+        credentials: 'same-origin',
+        cache: 'no-store'
+      });
+    } catch {
+      return null;
+    }
+
+    return readCookie(CSRF_COOKIE);
+  }
 
   async function handleSubmit(url: string, method: string, payload: unknown, successMessage: string) {
     setSaving(true);
     setErrors({});
     setRetryTarget(null);
     try {
+      const csrfToken = readCookie(CSRF_COOKIE) ?? (await initCsrfToken());
+      if (!csrfToken) {
+        setToast({ title: 'Last save failed', description: 'Could not initialize secure session token.' });
+        setRetryTarget('mutation');
+        return;
+      }
+
       const response = await fetch(url, {
         method,
-        headers: { 'Content-Type': 'application/json' },
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json', [CSRF_HEADER]: csrfToken },
         body: JSON.stringify(payload)
       });
       const result: ApiEnvelope<unknown> = await response.json();
@@ -124,6 +175,102 @@ export function DealerWorkspaceClient({
     }
   }
 
+  function formatMoney(value: number | null) {
+    if (value == null) return '—';
+    return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(value);
+  }
+
+  async function runAuctionUrlFlow() {
+    setRetryTarget(null);
+    setErrors({});
+    setAuctionFlowResult(null);
+    setRunningAuctionFlow(true);
+
+    try {
+      const csrfToken = readCookie(CSRF_COOKIE) ?? (await initCsrfToken());
+      if (!csrfToken) {
+        setToast({ title: 'Last save failed', description: 'Could not initialize secure session token.' });
+        setRetryTarget('mutation');
+        return;
+      }
+
+      const createdVehicleResponse = await fetch('/api/vehicles', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json', [CSRF_HEADER]: csrfToken },
+        body: JSON.stringify({ listingUrl: auctionUrlInput.trim() })
+      });
+
+      const createdVehicleEnvelope: ApiEnvelope<{ id: string; vin: string | null; listingUrl?: string | null }> = await createdVehicleResponse.json();
+      if (!createdVehicleEnvelope.ok) {
+        setToast({ title: createdVehicleEnvelope.error.message, description: createdVehicleEnvelope.error.code });
+        setRetryTarget('mutation');
+        return;
+      }
+
+      const createdVehicle = createdVehicleEnvelope.data;
+      const vehicleLabel = getVehicleLabel(createdVehicle);
+
+      if (!createdVehicle.vin) {
+        setAuctionFlowResult({
+          vehicleLabel,
+          marketValue: null,
+          repairEstimate: null,
+          projectedProfit: null,
+          maximumBid: null,
+          buyOrPass: 'PASS'
+        });
+        setToast({ title: 'Vehicle created', description: 'VIN not found in URL, so valuation metrics are pending.' });
+        router.refresh();
+        return;
+      }
+
+      const analysisResponse = await fetch('/api/vin-analyses/analyze', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json', [CSRF_HEADER]: csrfToken },
+        body: JSON.stringify({
+          vehicleId: createdVehicle.id,
+          vin: createdVehicle.vin,
+          mileage: 0
+        })
+      });
+
+      const analysisEnvelope: ApiEnvelope<{
+        valuation: { value: { value: { marketValue: number } } };
+        damage: { value: { totalCost: number } };
+        auctionBid: { value: { projectedProfit: number; maxBid: number; recommendation?: 'Proceed' | 'Reconsider' | 'Pause' } };
+        recommendation: string;
+      }> = await analysisResponse.json();
+
+      if (!analysisEnvelope.ok) {
+        setToast({ title: analysisEnvelope.error.message, description: analysisEnvelope.error.code });
+        setRetryTarget('mutation');
+        router.refresh();
+        return;
+      }
+
+      const analysis = analysisEnvelope.data;
+      const bidRecommendation = analysis.auctionBid.value.recommendation;
+      const buyOrPass = bidRecommendation === 'Proceed' ? 'BUY' : bidRecommendation === 'Reconsider' || bidRecommendation === 'Pause' ? 'PASS' : analysis.recommendation === 'PASS' ? 'PASS' : 'BUY';
+      setAuctionFlowResult({
+        vehicleLabel,
+        marketValue: analysis.valuation.value.value.marketValue,
+        repairEstimate: analysis.damage.value.totalCost,
+        projectedProfit: analysis.auctionBid.value.projectedProfit,
+        maximumBid: analysis.auctionBid.value.maxBid,
+        buyOrPass
+      });
+      setToast({ title: 'DealerOS completed analysis', description: `Vehicle ${vehicleLabel} created and analyzed.` });
+      router.refresh();
+    } catch (error) {
+      setToast({ title: 'Request failed', description: error instanceof Error ? error.message : 'Unknown error' });
+      setRetryTarget('mutation');
+    } finally {
+      setRunningAuctionFlow(false);
+    }
+  }
+
   if (loaderError) {
     return <InlineRetry title="Dealer workspace data could not be loaded" description="The dashboard data request failed. Retry to reload vehicles, analyses, and activity." onRetry={() => router.refresh()} />;
   }
@@ -133,21 +280,57 @@ export function DealerWorkspaceClient({
       {toast ? <Toast title={toast.title} description={toast.description} /> : null}
       {retryTarget === 'mutation' ? <InlineRetry title="Last save failed" description="Your changes were not saved. Review the form and retry." onRetry={() => router.refresh()} /> : null}
 
+      <Card>
+        <h3 className="text-lg font-semibold">Paste Auction URL</h3>
+        <div className="mt-3 grid gap-3 md:grid-cols-[1fr_auto]">
+          <Input disabled={controlsDisabled || runningAuctionFlow} placeholder="https://www.iaai.com/... or https://www.copart.com/..." value={auctionUrlInput} onChange={(e) => setAuctionUrlInput(e.target.value)} />
+          <Button disabled={controlsDisabled || runningAuctionFlow || !auctionUrlInput.trim()} onClick={runAuctionUrlFlow}>{runningAuctionFlow ? 'DealerOS is working...' : 'DealerOS does everything'}</Button>
+        </div>
+
+        {auctionFlowResult ? (
+          <div className="mt-5 grid gap-3 rounded-xl border border-border bg-neutral-50 p-4 sm:grid-cols-2 lg:grid-cols-6">
+            <div className="sm:col-span-2 lg:col-span-6 text-sm font-medium text-neutral-700">Vehicle appears: {auctionFlowResult.vehicleLabel}</div>
+            <div>
+              <div className="text-xs uppercase tracking-[0.15em] text-neutral-500">Market value</div>
+              <div className="mt-1 font-semibold">{formatMoney(auctionFlowResult.marketValue)}</div>
+            </div>
+            <div>
+              <div className="text-xs uppercase tracking-[0.15em] text-neutral-500">Repair estimate</div>
+              <div className="mt-1 font-semibold">{formatMoney(auctionFlowResult.repairEstimate)}</div>
+            </div>
+            <div>
+              <div className="text-xs uppercase tracking-[0.15em] text-neutral-500">Profit</div>
+              <div className="mt-1 font-semibold">{formatMoney(auctionFlowResult.projectedProfit)}</div>
+            </div>
+            <div>
+              <div className="text-xs uppercase tracking-[0.15em] text-neutral-500">Maximum bid</div>
+              <div className="mt-1 font-semibold">{formatMoney(auctionFlowResult.maximumBid)}</div>
+            </div>
+            <div>
+              <div className="text-xs uppercase tracking-[0.15em] text-neutral-500">Buy / Pass</div>
+              <div className="mt-1 font-semibold">{auctionFlowResult.buyOrPass}</div>
+            </div>
+          </div>
+        ) : null}
+      </Card>
+
       <div className="grid gap-6 lg:grid-cols-2">
         <Card>
           <h3 className="text-lg font-semibold">{editingVehicleId ? 'Edit vehicle' : 'Create vehicle'}</h3>
           {editingVehicleId ? <p className="mt-2 text-xs text-neutral-500">Editing an existing vehicle. Use clear to switch back to create mode.</p> : null}
           <div className="mt-4 grid gap-3">
+            <Input disabled={controlsDisabled} placeholder="Auction Listing URL" value={vehicleForm.listingUrl} onChange={(e) => setVehicleForm({ ...vehicleForm, listingUrl: e.target.value })} />
+            {errors.listingUrl ? <p className="text-sm text-red-600">{errors.listingUrl}</p> : null}
             <Input disabled={controlsDisabled} placeholder="VIN" value={vehicleForm.vin} onChange={(e) => setVehicleForm({ ...vehicleForm, vin: e.target.value })} />
             {errors.vin ? <p className="text-sm text-red-600">{errors.vin}</p> : null}
             <Input disabled={controlsDisabled} placeholder="Year" value={vehicleForm.year} onChange={(e) => setVehicleForm({ ...vehicleForm, year: e.target.value })} />
             <Input disabled={controlsDisabled} placeholder="Make" value={vehicleForm.make} onChange={(e) => setVehicleForm({ ...vehicleForm, make: e.target.value })} />
             <Input disabled={controlsDisabled} placeholder="Model" value={vehicleForm.model} onChange={(e) => setVehicleForm({ ...vehicleForm, model: e.target.value })} />
             <Input disabled={controlsDisabled} placeholder="Workflow state" value={vehicleForm.workflowState || ''} onChange={(e) => setVehicleForm({ ...vehicleForm, workflowState: e.target.value })} />
-            <Button disabled={controlsDisabled} onClick={() => handleSubmit(editingVehicleId ? `/api/vehicles/${editingVehicleId}` : '/api/vehicles', editingVehicleId ? 'PATCH' : 'POST', { vin: vehicleForm.vin, year: vehicleForm.year ? Number(vehicleForm.year) : undefined, make: vehicleForm.make || undefined, model: vehicleForm.model || undefined, workflowState: vehicleForm.workflowState || undefined }, editingVehicleId ? 'Vehicle updated' : 'Vehicle created')}>
+            <Button disabled={controlsDisabled} onClick={() => handleSubmit(editingVehicleId ? `/api/vehicles/${editingVehicleId}` : '/api/vehicles', editingVehicleId ? 'PATCH' : 'POST', { listingUrl: vehicleForm.listingUrl || undefined, vin: vehicleForm.vin || undefined, year: vehicleForm.year ? Number(vehicleForm.year) : undefined, make: vehicleForm.make || undefined, model: vehicleForm.model || undefined, workflowState: vehicleForm.workflowState || undefined }, editingVehicleId ? 'Vehicle updated' : 'Vehicle created')}>
               {saving ? 'Saving…' : editingVehicleId ? 'Update vehicle' : 'Create vehicle'}
             </Button>
-            {editingVehicleId ? <Button className="bg-white text-foreground border border-border" disabled={controlsDisabled} onClick={() => { setEditingVehicleId(null); setVehicleForm({ vin: '', year: '', make: '', model: '', workflowState: '' }); }}>Clear edit</Button> : null}
+            {editingVehicleId ? <Button className="bg-white text-foreground border border-border" disabled={controlsDisabled} onClick={() => { setEditingVehicleId(null); setVehicleForm({ listingUrl: '', vin: '', year: '', make: '', model: '', workflowState: '' }); }}>Clear edit</Button> : null}
           </div>
         </Card>
 
@@ -173,7 +356,7 @@ export function DealerWorkspaceClient({
       <Card>
         <h3 className="text-lg font-semibold">Vehicles</h3>
         <div className="mt-3 grid gap-2">
-          <Input disabled={controlsDisabled} placeholder="Filter vehicles by VIN, make, model, status, or workflow" value={vehicleQuery} onChange={(e) => setVehicleQuery(e.target.value)} />
+          <Input disabled={controlsDisabled} placeholder="Filter vehicles by VIN, listing URL, source, make, model, status, or workflow" value={vehicleQuery} onChange={(e) => setVehicleQuery(e.target.value)} />
           <p className="text-xs text-neutral-500">Showing {filteredVehicles.length} of {vehicles.length} vehicles</p>
         </div>
         {vehicles.length === 0 ? <p className="mt-3 text-sm text-neutral-600">No vehicles yet. Create your first acquisition record to begin.</p> : (
@@ -182,7 +365,7 @@ export function DealerWorkspaceClient({
             <div className="flex flex-wrap gap-2">
               {filteredVehicles.map((vehicle) => (
                 <div key={vehicle.id} className="flex gap-2">
-                  <Button className="bg-white text-foreground border border-border" disabled={controlsDisabled} onClick={() => { setEditingVehicleId(vehicle.id); setVehicleForm({ vin: vehicle.vin, year: vehicle.year?.toString() || '', make: vehicle.make || '', model: vehicle.model || '', workflowState: vehicle.workflowState || '' }); }}>Edit {vehicle.vin}</Button>
+                  <Button className="bg-white text-foreground border border-border" disabled={controlsDisabled} onClick={() => { setEditingVehicleId(vehicle.id); setVehicleForm({ listingUrl: vehicle.listingUrl || '', vin: vehicle.vin || '', year: vehicle.year?.toString() || '', make: vehicle.make || '', model: vehicle.model || '', workflowState: vehicle.workflowState || '' }); }}>Edit {getVehicleLabel(vehicle)}</Button>
                   <Button className="bg-red-600" disabled={controlsDisabled || deleting === `/api/vehicles/${vehicle.id}`} onClick={() => handleDelete(`/api/vehicles/${vehicle.id}`, 'Vehicle deleted')}>
                     {deleting === `/api/vehicles/${vehicle.id}` ? 'Deleting…' : 'Delete'}
                   </Button>
@@ -206,7 +389,7 @@ export function DealerWorkspaceClient({
             <div className="flex flex-wrap gap-2">
               {filteredAnalyses.map((analysis) => (
                 <div key={analysis.id} className="flex gap-2">
-                  <Button className="bg-white text-foreground border border-border" disabled={controlsDisabled} onClick={() => { setEditingAnalysisId(analysis.id); setVinForm({ vehicleId: analysis.vehicleId, marketValue: '', wholesaleValue: '', projectedRoi: analysis.projectedRoi?.toString() || '', confidenceScore: '', recommendation: analysis.recommendation || 'NEGOTIATE', workflowState: analysis.workflowState || '' }); }}>Edit analysis {analysis.vehicle.vin}</Button>
+                  <Button className="bg-white text-foreground border border-border" disabled={controlsDisabled} onClick={() => { setEditingAnalysisId(analysis.id); setVinForm({ vehicleId: analysis.vehicleId, marketValue: '', wholesaleValue: '', projectedRoi: analysis.projectedRoi?.toString() || '', confidenceScore: '', recommendation: analysis.recommendation || 'NEGOTIATE', workflowState: analysis.workflowState || '' }); }}>Edit analysis {getVehicleLabel(analysis.vehicle)}</Button>
                   <Button className="bg-red-600" disabled={controlsDisabled || deleting === `/api/vin-analyses/${analysis.id}`} onClick={() => handleDelete(`/api/vin-analyses/${analysis.id}`, 'VIN analysis deleted')}>
                     {deleting === `/api/vin-analyses/${analysis.id}` ? 'Deleting…' : 'Delete'}
                   </Button>

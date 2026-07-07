@@ -83,6 +83,8 @@ enum ListingStatus {
   DRAFT
   PUBLISHED
   UNPUBLISHED
+  POSTED
+  FAILED
 }
 
 enum SaleStatus {
@@ -152,6 +154,49 @@ enum NotificationType {
   ERROR
 }
 
+enum CustomerStatus {
+  LEAD
+  ACTIVE
+  WON
+  LOST
+}
+
+enum DealStage {
+  NEW
+  CONTACTED
+  QUALIFIED
+  OFFERED
+  NEGOTIATING
+  WON
+  LOST
+}
+
+enum ListingChannel {
+  FACEBOOK_MARKETPLACE
+  CRAIGSLIST
+  OFFERUP
+}
+
+enum AuctionSource {
+  COPART
+  IAA
+  MANHEIM
+}
+
+enum NotificationChannel {
+  IN_APP
+  EMAIL
+  SMS
+  PUSH
+}
+
+enum NotificationStatus {
+  PENDING
+  SENT
+  READ
+  FAILED
+}
+
 enum JobStatus {
   PENDING
   RUNNING
@@ -166,6 +211,9 @@ model Organization {
   updatedAt         DateTime                @updatedAt
   memberships       Membership[]
   vehicles          Vehicle[]
+  deals             Deal[]
+  listingPosts      ListingPost[]
+  auctionListings   AuctionListing[]
   auditLogs         AuditLog[]
   activityLogs      ActivityLog[]
   customers         Customer[]
@@ -228,7 +276,7 @@ model Membership {
 model Vehicle {
   id                String             @id @default(cuid())
   organizationId    String
-  vin               String             @unique
+  vin               String?
   year              Int?
   make              String?
   model             String?
@@ -239,10 +287,14 @@ model Vehicle {
   inventoryStage    InventoryStage     @default(ACQUISITION)
   acquisitionCost   Decimal?           @db.Decimal(12, 2)
   acquisitionSource String?
+  auctionSource     AuctionSource?
+  listingUrl        String?
   createdAt         DateTime           @default(now())
   updatedAt         DateTime           @updatedAt
   organization      Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   vinAnalyses       VinAnalysis[]
+  deals             Deal[]
+  listingPosts      ListingPost[]
   leads             Lead[]
   inspectionReports InspectionReport[]
   priceRecords      PriceRecord[]
@@ -250,23 +302,8 @@ model Vehicle {
   sales             Sale[]
 
   @@index([organizationId, status])
-}
-
-model Customer {
-  id              String         @id @default(cuid())
-  organizationId  String
-  firstName       String
-  lastName        String
-  email           String?
-  phone           String?
-  notes           String?
-  status          CustomerStatus @default(LEAD)
-  createdAt       DateTime       @default(now())
-  updatedAt       DateTime       @updatedAt
-  organization    Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  deals           Deal[]
-
-  @@index([organizationId, status])
+  @@unique([organizationId, vin])
+  @@unique([organizationId, listingUrl])
 }
 
 model Deal {
@@ -330,24 +367,6 @@ model AuctionListing {
 
   @@unique([source, lotNumber])
   @@index([organizationId, source, createdAt])
-}
-
-model Notification {
-  id              String              @id @default(cuid())
-  organizationId  String
-  actorUserId     String?
-  channel         NotificationChannel @default(IN_APP)
-  status          NotificationStatus  @default(PENDING)
-  title           String
-  message         String
-  metadata        Json?
-  readAt          DateTime?
-  sentAt          DateTime?
-  createdAt       DateTime            @default(now())
-  updatedAt       DateTime            @updatedAt
-  organization    Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-
-  @@index([organizationId, status, createdAt])
 }
 
 model VinAnalysis {
@@ -461,18 +480,21 @@ model Customer {
   lastName       String
   email          String?
   phone          String?
+  notes          String?
+  status         CustomerStatus @default(LEAD)
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
   organization   Organization            @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  deals          Deal[]
   leads          Lead[]
   tasks          Task[]
-  notes          Note[]
+  crmNotes       Note[]
   communications CommunicationLogEntry[]
   appointments   Appointment[]
   sales          Sale[]
 
-  @@index([organizationId])
+  @@index([organizationId, status])
 }
 
 model Lead {
@@ -829,17 +851,25 @@ model ApiKey {
 model Notification {
   id             String           @id @default(cuid())
   organizationId String
-  userId         String
+  userId         String?
+  actorUserId    String?
+  channel        NotificationChannel @default(IN_APP)
+  status         NotificationStatus  @default(PENDING)
   type           NotificationType @default(INFO)
   title          String
-  body           String
+  message        String?
+  body           String?
   link           String?
+  metadata       Json?
   readAt         DateTime?
+  sentAt         DateTime?
   createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user         User?        @relation(fields: [userId], references: [id], onDelete: SetNull)
 
+  @@index([organizationId, status, createdAt])
   @@index([organizationId, userId, readAt])
   @@index([userId, createdAt])
 }

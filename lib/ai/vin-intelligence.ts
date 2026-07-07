@@ -11,8 +11,9 @@ export type VinIntelligenceResult = {
   total: number;
 };
 
-export function buildVinIntelligenceInsights(items: Array<{ vin: string; mileage?: number | null; status?: string | null }>): VinIntelligenceResult {
+export function buildVinIntelligenceInsights(items: Array<{ vin?: string | null; mileage?: number | null; status?: string | null }>): VinIntelligenceResult {
   const insights = items.map((item) => {
+    const vin = item.vin ?? 'UNKNOWN';
     const mileage = item.mileage ?? 0;
     const isHighMileage = mileage > 80000;
     const isPass = item.status === 'PASSED' || item.status === 'SOLD';
@@ -28,8 +29,8 @@ export function buildVinIntelligenceInsights(items: Array<{ vin: string; mileage
     else if (flags.some((flag) => flag.includes('High'))) recommendation = 'NEGOTIATE';
 
     return {
-      vin: item.vin,
-      summary: `${item.vin.slice(0, 8)} is ${isHighMileage ? 'a high-mileage' : 'a strong'} candidate for the current queue.`,
+      vin,
+      summary: `${vin.slice(0, 8)} is ${isHighMileage ? 'a high-mileage' : 'a strong'} candidate for the current queue.`,
       confidence: Math.min(0.96, 0.72 + (flags.length * 0.08)),
       flags,
       recommendation

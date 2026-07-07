@@ -12,7 +12,12 @@ vi.mock('@/lib/db/client', () => ({
   db: {
     vehicle: {
       findMany: vi.fn(async ({ where }) => state.vehicles.filter((v) => v.organizationId === where.organizationId)),
-      findFirst: vi.fn(async ({ where }) => state.vehicles.find((v) => v.id === where.id && v.organizationId === where.organizationId) || null),
+      findFirst: vi.fn(async ({ where }) => state.vehicles.find((v) => {
+        if (where.id) return v.id === where.id && v.organizationId === where.organizationId;
+        if (where.vin) return v.vin === where.vin && v.organizationId === where.organizationId;
+        if (where.listingUrl) return v.listingUrl === where.listingUrl && v.organizationId === where.organizationId;
+        return false;
+      }) || null),
       findFirstOrThrow: vi.fn(async ({ where }) => {
         const row = state.vehicles.find((v) => v.id === where.id && v.organizationId === where.organizationId);
         if (!row) throw new Error('Record not found');
@@ -49,6 +54,32 @@ describe('vehicle service execution', () => {
     expect(state.vehicles.some((v) => v.vin === '3HGCM82633A004352')).toBe(true);
     expect(state.auditLogs).toHaveLength(1);
     expect(state.activityLogs).toHaveLength(1);
+  });
+
+  it('creates auction vehicle from listing url without vin', async () => {
+    const { createVehicleForOrg } = await import('@/lib/server/vehicle-service');
+    const created = await createVehicleForOrg(authMocks.dealer.organizationId, authMocks.dealer.userId, {
+      listingUrl: 'https://www.copart.com/lot/12345678/clean-title-2019-honda-civic-1HGCM82633A765432',
+      make: 'Honda',
+      model: 'Civic'
+    });
+
+    expect(created.listingUrl).toBe('https://www.copart.com/lot/12345678/clean-title-2019-honda-civic-1HGCM82633A765432');
+    expect(created.auctionSource).toBe('COPART');
+    expect(created.vin).toBe('1HGCM82633A765432');
+  });
+
+  it('prevents duplicate listing url when vin is missing', async () => {
+    const { createVehicleForOrg } = await import('@/lib/server/vehicle-service');
+    await createVehicleForOrg(authMocks.dealer.organizationId, authMocks.dealer.userId, {
+      listingUrl: 'https://www.manheim.com/inventory/lot/abc-123',
+      make: 'Ford'
+    });
+
+    await expect(createVehicleForOrg(authMocks.dealer.organizationId, authMocks.dealer.userId, {
+      listingUrl: 'https://www.manheim.com/inventory/lot/abc-123',
+      model: 'F-150'
+    })).rejects.toMatchObject({ status: 409, code: 'DUPLICATE_VEHICLE' });
   });
 
   it('updates vehicle only inside organization and writes logs', async () => {

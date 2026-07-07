@@ -7,10 +7,13 @@ import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
 import { Table } from '@/components/ui/table';
 
+const CSRF_COOKIE = 'csrf_token';
+const CSRF_HEADER = 'x-csrf-token';
+
 type HomeProps = {
   user: { email: string; role: string };
   stats: { vehicles: number; analyzed: number; customers: number; deals: number; listings: number; notifications: number };
-  vehicles: Array<{ id: string; vin: string; make: string | null; model: string | null; year: number | null; status: string }>;
+  vehicles: Array<{ id: string; vin: string | null; listingUrl?: string | null; auctionSource?: string | null; make: string | null; model: string | null; year: number | null; status: string }>;
   customers: Array<{ id: string; firstName: string; lastName: string; email: string | null; status: string }>;
   deals: Array<{ id: string; stage: string; amount: number | null; customerName: string; vehicleVin: string | null }>;
   notifications: Array<{ id: string; title: string; message: string; status: string }>;
@@ -19,6 +22,20 @@ type HomeProps = {
   canManageRoles: boolean;
 };
 
+function readCookie(name: string): string | null {
+  const match = document.cookie
+    .split(';')
+    .map((part) => part.trim())
+    .find((part) => part.startsWith(`${name}=`));
+
+  if (!match) return null;
+  return decodeURIComponent(match.slice(name.length + 1));
+}
+
+function getVehicleLabel(vehicle: { vin?: string | null; listingUrl?: string | null }) {
+  return vehicle.vin ?? vehicle.listingUrl ?? 'Pending auction vehicle';
+}
+
 export function DealerHomeDashboard(props: HomeProps) {
   const [busy, setBusy] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
@@ -26,7 +43,7 @@ export function DealerHomeDashboard(props: HomeProps) {
   const [customerQuery, setCustomerQuery] = useState('');
   const [dealQuery, setDealQuery] = useState('');
 
-  const [vehicleForm, setVehicleForm] = useState({ vin: '', make: '', model: '', year: '' });
+  const [vehicleForm, setVehicleForm] = useState({ listingUrl: '', vin: '', make: '', model: '', year: '' });
   const [vinInput, setVinInput] = useState('');
   const [vinResult, setVinResult] = useState<any>(null);
   const [crmForm, setCrmForm] = useState({ firstName: '', lastName: '', email: '' });
@@ -37,7 +54,7 @@ export function DealerHomeDashboard(props: HomeProps) {
   const filteredVehicles = useMemo(() => {
     const query = vehicleQuery.trim().toLowerCase();
     if (!query) return props.vehicles;
-    return props.vehicles.filter((v) => `${v.vin} ${v.year ?? ''} ${v.make ?? ''} ${v.model ?? ''} ${v.status}`.toLowerCase().includes(query));
+    return props.vehicles.filter((v) => `${v.vin ?? ''} ${v.listingUrl ?? ''} ${v.auctionSource ?? ''} ${v.year ?? ''} ${v.make ?? ''} ${v.model ?? ''} ${v.status}`.toLowerCase().includes(query));
   }, [props.vehicles, vehicleQuery]);
 
   const filteredCustomers = useMemo(() => {
@@ -52,7 +69,7 @@ export function DealerHomeDashboard(props: HomeProps) {
     return props.deals.filter((d) => `${d.id} ${d.customerName} ${d.vehicleVin ?? ''} ${d.stage} ${d.amount ?? ''}`.toLowerCase().includes(query));
   }, [props.deals, dealQuery]);
 
-  const vehicleRows = useMemo(() => filteredVehicles.map((v) => [v.vin, [v.year, v.make, v.model].filter(Boolean).join(' '), v.status]), [filteredVehicles]);
+  const vehicleRows = useMemo(() => filteredVehicles.map((v) => [getVehicleLabel(v), [v.year, v.make, v.model].filter(Boolean).join(' '), v.status]), [filteredVehicles]);
   const customerRows = useMemo(() => filteredCustomers.map((c) => [`${c.firstName} ${c.lastName}`, c.email ?? '-', c.status]), [filteredCustomers]);
   const dealRows = useMemo(() => filteredDeals.map((d) => [d.id.slice(0, 8), d.customerName, d.vehicleVin ?? '-', d.stage, d.amount ?? '-']), [filteredDeals]);
 
@@ -70,6 +87,55 @@ export function DealerHomeDashboard(props: HomeProps) {
       setMessage('Saved successfully. Refreshing dashboard...');
       window.location.reload();
       return payload.data;
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'Request failed');
+      throw error;
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function initCsrfToken() {
+    try {
+      await fetch('/api/auth/csrf', {
+        method: 'GET',
+        credentials: 'same-origin',
+        cache: 'no-store'
+      });
+    } catch {
+      return null;
+    }
+
+    return readCookie(CSRF_COOKIE);
+  }
+
+  async function createVehicle() {
+    setBusy('POST:/api/vehicles');
+    setMessage(null);
+    try {
+      const csrfToken = readCookie(CSRF_COOKIE) ?? (await initCsrfToken());
+      if (!csrfToken) throw new Error('Could not initialize secure session token. Refresh and try again.');
+
+      const response = await fetch('/api/vehicles', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: {
+          'Content-Type': 'application/json',
+          [CSRF_HEADER]: csrfToken
+        },
+        body: JSON.stringify({
+          listingUrl: vehicleForm.listingUrl || undefined,
+          vin: vehicleForm.vin || undefined,
+          make: vehicleForm.make || undefined,
+          model: vehicleForm.model || undefined,
+          year: vehicleForm.year ? Number(vehicleForm.year) : undefined
+        })
+      });
+
+      const payload = await response.json();
+      if (!payload.ok) throw new Error(payload.error?.message ?? 'Request failed');
+      setMessage('Saved successfully. Refreshing dashboard...');
+      window.location.reload();
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'Request failed');
       throw error;
@@ -149,7 +215,7 @@ export function DealerHomeDashboard(props: HomeProps) {
               <Card>
                 <h3 className="text-lg font-semibold">Inventory Management</h3>
                 <div className="mt-3 grid gap-2">
-                  <Input placeholder="Filter inventory by VIN, make, model, or status" value={vehicleQuery} onChange={(e) => setVehicleQuery(e.target.value)} />
+                  <Input placeholder="Filter inventory by VIN, listing URL, source, make, model, or status" value={vehicleQuery} onChange={(e) => setVehicleQuery(e.target.value)} />
                   <p className="text-xs text-neutral-500">Showing {filteredVehicles.length} of {props.vehicles.length} vehicles</p>
                 </div>
                 <div className="mt-4"><Table headers={['VIN', 'Vehicle', 'Status']} rows={vehicleRows} /></div>
@@ -157,11 +223,12 @@ export function DealerHomeDashboard(props: HomeProps) {
               <Card>
                 <h3 className="text-lg font-semibold">Add Vehicle</h3>
                 <div className="mt-3 grid gap-3">
+                  <Input placeholder="Auction Listing URL" value={vehicleForm.listingUrl} onChange={(e) => setVehicleForm({ ...vehicleForm, listingUrl: e.target.value })} />
                   <Input placeholder="VIN" value={vehicleForm.vin} onChange={(e) => setVehicleForm({ ...vehicleForm, vin: e.target.value })} />
                   <Input placeholder="Make" value={vehicleForm.make} onChange={(e) => setVehicleForm({ ...vehicleForm, make: e.target.value })} />
                   <Input placeholder="Model" value={vehicleForm.model} onChange={(e) => setVehicleForm({ ...vehicleForm, model: e.target.value })} />
                   <Input placeholder="Year" value={vehicleForm.year} onChange={(e) => setVehicleForm({ ...vehicleForm, year: e.target.value })} />
-                  <Button disabled={!!busy} onClick={() => request('/api/vehicles', 'POST', { vin: vehicleForm.vin, make: vehicleForm.make || undefined, model: vehicleForm.model || undefined, year: vehicleForm.year ? Number(vehicleForm.year) : undefined })}>{busy ? 'Saving...' : 'Create Vehicle'}</Button>
+                  <Button disabled={!!busy} onClick={createVehicle}>{busy ? 'Saving...' : 'Create Vehicle'}</Button>
                 </div>
               </Card>
             </section>
@@ -180,7 +247,7 @@ export function DealerHomeDashboard(props: HomeProps) {
                 <div className="mt-3 grid gap-2">
                   <Select onChange={(e) => e.target.value ? fetchPricing(e.target.value) : null} defaultValue="">
                     <option value="">Select vehicle</option>
-                    {props.vehicles.map((v) => <option key={v.id} value={v.id}>{v.vin}</option>)}
+                    {props.vehicles.map((v) => <option key={v.id} value={v.id}>{getVehicleLabel(v)}</option>)}
                   </Select>
                 </div>
                 {pricingOutput ? <pre className="mt-3 overflow-auto rounded-xl bg-neutral-900 p-3 text-xs text-neutral-100">{JSON.stringify(pricingOutput, null, 2)}</pre> : null}

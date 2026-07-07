@@ -151,7 +151,7 @@ export default async function DealerPage() {
             <Card>
               <div className="text-sm font-semibold text-neutral-700">AI opportunity watchlist</div>
               <div className="mt-3 space-y-2">
-                {data.opportunities.slice(0, 4).map((item: (typeof data.opportunities)[number]) => (
+                {(data.opportunities ?? []).slice(0, 4).map((item: (typeof data.opportunities)[number]) => (
                   <div key={item.id} className="rounded-lg border border-border p-3">
                     <div className="flex items-center justify-between gap-2">
                       <div className="font-medium">{item.vin}</div>
