@@ -21,13 +21,13 @@ export default async function AdminPage() {
         <Card>
           <div className="text-sm font-semibold text-neutral-700">Recent activity</div>
           <ul className="mt-3 space-y-2 text-sm text-neutral-700">
-            {data.recentActivity.map((item) => <li key={item.id} className="rounded-lg border border-border p-2">{item.summary} <span className="text-neutral-500">({item.type})</span></li>)}
+            {data.recentActivity.map((item: { id: string; summary: string; type: string }) => <li key={item.id} className="rounded-lg border border-border p-2">{item.summary} <span className="text-neutral-500">({item.type})</span></li>)}
           </ul>
         </Card>
         <Card>
           <div className="text-sm font-semibold text-neutral-700">Recent audit</div>
           <ul className="mt-3 space-y-2 text-sm text-neutral-700">
-            {data.recentAudit.map((item) => <li key={item.id} className="rounded-lg border border-border p-2">{item.action} • {item.entityType}</li>)}
+            {data.recentAudit.map((item: { id: string; action: string; entityType: string }) => <li key={item.id} className="rounded-lg border border-border p-2">{item.action} • {item.entityType}</li>)}
           </ul>
         </Card>
       </div>
