@@ -1,5 +1,4 @@
 import { db } from '@/lib/db/client';
-import type { Prisma } from '@prisma/client';
 
 type WriteActivityLogInput = {
   organizationId: string;
@@ -8,9 +7,9 @@ type WriteActivityLogInput = {
   entityId: string;
   type: string;
   summary: string;
-  payload?: Prisma.JsonValue;
+  payload?: unknown;
 };
 
 export async function writeActivityLog(input: WriteActivityLogInput) {
-  return db.activityLog.create({ data: input });
+  return db.activityLog.create({ data: input as any });
 }
