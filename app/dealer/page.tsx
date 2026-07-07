@@ -27,7 +27,7 @@ export default async function DealerPage() {
     const data = await loadDealerDashboard(session.organizationId);
     const workflowSummary = summarizeWorkflowStates(data.recentVehicles, data.analyses);
 
-    const analysesWithNumbers = data.analyses.map((item) => ({
+    const analysesWithNumbers = data.analyses.map((item: (typeof data.analyses)[number]) => ({
       ...item,
       marketValue: item.marketValue ? Number(item.marketValue) : null,
       wholesaleValue: item.wholesaleValue ? Number(item.wholesaleValue) : null,
@@ -38,8 +38,8 @@ export default async function DealerPage() {
     }));
 
     const damageItems = analysesWithNumbers
-      .filter((a) => a.repairEstimate != null && a.repairEstimate > 0)
-      .map((a) => ({
+      .filter((a: (typeof analysesWithNumbers)[number]) => a.repairEstimate != null && a.repairEstimate > 0)
+      .map((a: (typeof analysesWithNumbers)[number]) => ({
         id: a.id,
         title: `${a.vehicle.vin} repair estimate`,
         severity: toDamageSeverity(a.repairEstimate!),
@@ -48,8 +48,8 @@ export default async function DealerPage() {
       }));
 
     const auctionItems = analysesWithNumbers
-      .filter((a) => a.retailValue != null)
-      .map((a) => ({
+      .filter((a: (typeof analysesWithNumbers)[number]) => a.retailValue != null)
+      .map((a: (typeof analysesWithNumbers)[number]) => ({
         id: a.id,
         title: a.vehicle.vin,
         purchasePrice: a.wholesaleValue ?? 0,
@@ -60,7 +60,7 @@ export default async function DealerPage() {
         demandScore: a.confidenceScore ?? 0.6
       }));
 
-    const repairItems = damageItems.map((item) => ({
+    const repairItems = damageItems.map((item: (typeof damageItems)[number]) => ({
       id: item.id,
       title: item.title,
       // Reverse-derived so the panel's internal cost formula (laborHours *
@@ -73,8 +73,8 @@ export default async function DealerPage() {
     }));
 
     const pricingItems = analysesWithNumbers
-      .filter((a) => a.retailValue != null)
-      .map((a) => ({
+      .filter((a: (typeof analysesWithNumbers)[number]) => a.retailValue != null)
+      .map((a: (typeof analysesWithNumbers)[number]) => ({
         title: a.vehicle.vin,
         retailPrice: a.retailValue!,
         repairCost: a.repairEstimate ?? 0,
@@ -133,7 +133,7 @@ export default async function DealerPage() {
           </div>
 
           <div className="grid gap-4 lg:grid-cols-2">
-            <VinIntelligencePanel items={data.recentVehicles.map((vehicle) => ({ vin: vehicle.vin, mileage: vehicle.mileage, status: vehicle.status }))} />
+            <VinIntelligencePanel items={data.recentVehicles.map((vehicle: (typeof data.recentVehicles)[number]) => ({ vin: vehicle.vin, mileage: vehicle.mileage, status: vehicle.status }))} />
             <DamageAnalysisPanel items={damageItems} />
           </div>
 
@@ -151,7 +151,7 @@ export default async function DealerPage() {
             <Card>
               <div className="text-sm font-semibold text-neutral-700">AI opportunity watchlist</div>
               <div className="mt-3 space-y-2">
-                {data.opportunities.slice(0, 4).map((item) => (
+                {data.opportunities.slice(0, 4).map((item: (typeof data.opportunities)[number]) => (
                   <div key={item.id} className="rounded-lg border border-border p-3">
                     <div className="flex items-center justify-between gap-2">
                       <div className="font-medium">{item.vin}</div>
@@ -168,7 +168,7 @@ export default async function DealerPage() {
               <div className="mt-3 space-y-2 text-sm text-neutral-700">
                 <div className="font-medium">{workflowSummary.total} records across {workflowSummary.stageCount} stages</div>
                 <ul className="space-y-1">
-                  {workflowSummary.activeStates.map((item) => (
+                  {workflowSummary.activeStates.map((item: (typeof workflowSummary.activeStates)[number]) => (
                     <li key={item.state} className="flex items-center justify-between rounded-lg border border-border px-2 py-1">
                       <span>{item.state}</span>
                       <span className="text-neutral-500">{item.count}</span>
@@ -180,7 +180,7 @@ export default async function DealerPage() {
             <Card>
               <div className="text-sm font-semibold text-neutral-700">Recent activity</div>
               <ul className="mt-3 space-y-2 text-sm text-neutral-700">
-                {data.activity.map((item) => (
+                {data.activity.map((item: (typeof data.activity)[number]) => (
                   <li key={item.id} className="rounded-lg border border-border p-2">
                     {item.summary} <span className="text-neutral-500">({item.type})</span>
                   </li>
@@ -192,7 +192,7 @@ export default async function DealerPage() {
               <ul className="mt-3 space-y-2 text-sm text-neutral-700">
                 {data.notifications.length === 0 ? (
                   <li className="rounded-lg border border-border p-2 text-neutral-500">No notifications yet.</li>
-                ) : data.notifications.map((item) => (
+                ) : data.notifications.map((item: (typeof data.notifications)[number]) => (
                   <li key={item.id} className="rounded-lg border border-border p-2">
                     <div className="font-medium">{item.title}</div>
                     <div className="text-neutral-600">{item.message}</div>
@@ -205,7 +205,7 @@ export default async function DealerPage() {
 
           <DealerWorkspaceClient
             vehicles={data.recentVehicles}
-            analyses={data.analyses.map((item) => ({
+            analyses={data.analyses.map((item: (typeof data.analyses)[number]) => ({
               id: item.id,
               vehicleId: item.vehicleId,
               recommendation: item.recommendation,
@@ -213,7 +213,7 @@ export default async function DealerPage() {
               projectedRoi: item.projectedRoi ? Number(item.projectedRoi) : null,
               vehicle: { vin: item.vehicle.vin }
             }))}
-            activity={data.activity.map((item) => ({ id: item.id, summary: item.summary, type: item.type }))}
+            activity={data.activity.map((item: (typeof data.activity)[number]) => ({ id: item.id, summary: item.summary, type: item.type }))}
           />
         </div>
       </DashboardShell>
