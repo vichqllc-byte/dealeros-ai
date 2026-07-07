@@ -8,7 +8,7 @@ type WriteActivityLogInput = {
   entityId: string;
   type: string;
   summary: string;
-  payload?: Prisma.InputJsonValue;
+  payload?: Prisma.JsonValue;
 };
 
 export async function writeActivityLog(input: WriteActivityLogInput) {
