@@ -1,4 +1,3 @@
-import { ListingChannel, ListingStatus } from '@prisma/client';
 import { db } from '@/lib/db/client';
 import { createListingPostSchema } from '@/lib/validators/listing';
 import { publishMarketplaceListing } from '@/lib/integrations/marketplace-client';
@@ -12,14 +11,14 @@ export async function createAndPublishListing(organizationId: string, actorUserI
   const vehicle = await db.vehicle.findFirst({ where: { id: input.vehicleId, organizationId } });
   if (!vehicle) throw new AppError('Vehicle not found', 404, 'NOT_FOUND');
 
-  const providerResult = await publishMarketplaceListing(input.channel as ListingChannel, {
+  const providerResult = await publishMarketplaceListing(input.channel, {
     title: input.title,
     description: input.description,
     price: input.price,
     vin: vehicle.vin
   });
 
-  const status: ListingStatus = providerResult.status === 'POSTED' ? 'POSTED' : 'FAILED';
+  const status = providerResult.status === 'POSTED' ? 'POSTED' : 'FAILED';
 
   const listing = await db.listingPost.create({
     data: {

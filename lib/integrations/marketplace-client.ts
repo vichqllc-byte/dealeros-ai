@@ -1,7 +1,8 @@
-import { ListingChannel } from '@prisma/client';
 import { MarketplacePostInput, MarketplacePostResult } from '@/lib/integrations/types';
 import { AppError } from '@/lib/api/responses';
 import { requireIntegrationConfig } from '@/lib/integrations/errors';
+
+type ListingChannel = 'FACEBOOK_MARKETPLACE' | 'CRAIGSLIST' | 'OFFERUP';
 
 export async function publishMarketplaceListing(channel: ListingChannel, input: MarketplacePostInput): Promise<MarketplacePostResult> {
   const endpoint = process.env.MARKETPLACE_POSTING_API_URL;
