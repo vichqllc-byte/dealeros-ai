@@ -1,4 +1,3 @@
-import { Prisma } from '@prisma/client';
 import { db } from '@/lib/db/client';
 import { createLogger } from '@/lib/logging/logger';
 
@@ -29,7 +28,7 @@ export function clearJobHandlers() {
 }
 
 export async function enqueueJob(type: string, payload?: unknown, runAt: Date = new Date()) {
-  return db.job.create({ data: { type, payload: payload as Prisma.InputJsonValue, runAt } });
+  return db.job.create({ data: { type, payload: payload as any, runAt } });
 }
 
 export async function processDueJobs(batchSize = 10) {
