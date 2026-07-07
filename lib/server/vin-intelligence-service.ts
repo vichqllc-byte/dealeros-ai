@@ -1,4 +1,3 @@
-import { Prisma } from '@prisma/client';
 import { db } from '@/lib/db/client';
 import { AppError } from '@/lib/api/responses';
 import { writeAuditLog } from '@/lib/audit/write-audit-log';
@@ -9,7 +8,7 @@ import { createLogger } from '@/lib/logging/logger';
 
 const logger = createLogger('vin-intelligence-db-service');
 
-function extractPriorMileage(decodedPayload: Prisma.JsonValue): number | null {
+function extractPriorMileage(decodedPayload: unknown): number | null {
   if (decodedPayload && typeof decodedPayload === 'object' && !Array.isArray(decodedPayload)) {
     const value = (decodedPayload as Record<string, unknown>).mileageAtAnalysis;
     if (typeof value === 'number') return value;

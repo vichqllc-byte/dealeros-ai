@@ -1,11 +1,10 @@
-import { Prisma } from '@prisma/client';
 import { db } from '@/lib/db/client';
 import { AppError } from '@/lib/api/responses';
 import { InternalHistoryProvider, type InternalAnalysisRecord } from '@/lib/vin-intelligence/providers/vehicle-history/internal-history-provider';
 import { VehicleHistoryService, createDefaultVehicleHistoryProviders } from '@/lib/vin-intelligence/providers/vehicle-history/vehicle-history-service';
 import type { VehicleHistoryReport } from '@/lib/vin-intelligence/providers/vehicle-history/types';
 
-function extractMileage(decodedPayload: Prisma.JsonValue): number | null {
+function extractMileage(decodedPayload: unknown): number | null {
   if (decodedPayload && typeof decodedPayload === 'object' && !Array.isArray(decodedPayload)) {
     const value = (decodedPayload as Record<string, unknown>).mileageAtAnalysis;
     if (typeof value === 'number') return value;
