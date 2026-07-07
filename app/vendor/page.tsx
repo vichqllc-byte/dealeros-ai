@@ -23,7 +23,7 @@ export default async function VendorPage() {
         <Card>
           <div className="text-sm font-semibold text-neutral-700">Recent collaboration</div>
           <ul className="mt-3 space-y-2 text-sm text-neutral-700">
-            {data.recentMessages.map((item) => <li key={item.id} className="rounded-lg border border-border p-2">{item.body}</li>)}
+            {data.recentMessages.map((item: (typeof data.recentMessages)[number]) => <li key={item.id} className="rounded-lg border border-border p-2">{item.body}</li>)}
           </ul>
         </Card>
         <Card>
