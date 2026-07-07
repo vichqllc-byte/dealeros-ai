@@ -64,7 +64,7 @@ export async function analyzeVehicleVin(
     throw new AppError(error instanceof Error ? error.message : 'VIN analysis failed', 502, 'VIN_DECODE_FAILED');
   }
 
-  const decodedPayload: Prisma.InputJsonValue = { ...report.decoded.raw, mileageAtAnalysis: input.mileage };
+  const decodedPayload = { ...report.decoded.raw, mileageAtAnalysis: input.mileage } as any;
 
   const analysis = await db.vinAnalysis.create({
     data: {

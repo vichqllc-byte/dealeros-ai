@@ -6,12 +6,12 @@ type WriteSuperAdminAuditLogInput = {
   action: string;
   entityType: string;
   entityId: string;
-  beforeState?: Prisma.InputJsonValue;
-  afterState?: Prisma.InputJsonValue;
+  beforeState?: unknown;
+  afterState?: unknown;
 };
 
 export async function writeSuperAdminAuditLog(input: WriteSuperAdminAuditLogInput) {
-  return db.superAdminAuditLog.create({ data: input });
+  return db.superAdminAuditLog.create({ data: input as any });
 }
 
 export async function listSuperAdminAuditLog(limit = 100) {
