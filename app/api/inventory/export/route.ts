@@ -1,5 +1,4 @@
 import { NextResponse } from 'next/server';
-import type { Vehicle } from '@prisma/client';
 import { db } from '@/lib/db/client';
 import { requireRoutePermission } from '@/lib/server/route-auth';
 import { generateCsv, generateExcelWorkbook, type TabularData } from '@/lib/reporting/exporters';
@@ -16,7 +15,7 @@ export async function GET(request: Request) {
     const tabular: TabularData = {
       sheetName: 'Inventory',
       headers: ['VIN', 'Year', 'Make', 'Model', 'Mileage', 'Status', 'Inventory Stage', 'Acquisition Cost', 'Acquisition Source', 'Created At'],
-      rows: vehicles.map((v: Vehicle) => [
+      rows: vehicles.map((v: (typeof vehicles)[number]) => [
         v.vin, v.year, v.make, v.model, v.mileage, v.status, v.inventoryStage,
         v.acquisitionCost ? Number(v.acquisitionCost) : null, v.acquisitionSource, v.createdAt.toISOString()
       ])
