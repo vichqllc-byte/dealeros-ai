@@ -2,6 +2,7 @@ import { requireRoutePermission } from '@/lib/server/route-auth';
 import { createVehicleForOrg, listVehiclesForOrg } from '@/lib/server/vehicle-service';
 import { handleRouteError, ok } from '@/lib/api/responses';
 import { requireCsrfToken } from '@/lib/security/guards';
+import { db } from '@/lib/db/client';
 
 export async function GET(request: Request) {
   try {
